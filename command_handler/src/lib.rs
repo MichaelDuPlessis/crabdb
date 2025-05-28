@@ -3,52 +3,71 @@
 mod tcp_command_handler;
 
 /// The kinds of errors that can occur when recieving a command
-pub enum RecieveError {
+#[derive(Debug)]
+pub enum CommandError {
     /// The command type requested is invalid
     InvalidCommandType,
     /// Failed to recieve data from client
     RecieveFailed,
     /// No data was recieved
     ZeroLen,
+    /// The object provided was invalid such as being malformed or have a lenght of 0
+    InvalidObject,
+    /// The data type specified is invalid
+    InvalidDataType,
 }
 
-/// The type of command that is being sent.
-/// it is always 1 byte
-enum CommandType {
-    /// Get data from a specific key
-    Get,
-    /// Sets data on a specific key
-    Set,
+/// A key used to identify an object in the DB
+#[derive(Debug)]
+pub struct Key(String);
+
+/// An object stored in the database
+#[derive(Debug)]
+pub enum Object {
+    Int(i64),
 }
 
-impl TryFrom<u8> for CommandType {
-    type Error = RecieveError;
+impl TryFrom<&[u8]> for Object {
+    type Error = CommandError;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self::Get),
-            1 => Ok(Self::Set),
-            _ => Err(<Self as TryFrom<u8>>::Error::InvalidCommandType),
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        // if the slice is empty than no Object can be derived from it
+        if value.is_empty() {
+            return Err(<Self as TryFrom<&[u8]>>::Error::InvalidObject);
+        }
+
+        // first determine what data type is being used
+        let d_type = value[0];
+
+        match d_type {
+            0 => Ok(Self::Int(i64::from_be_bytes(
+                value[1..]
+                    .try_into()
+                    .map_err(|_| <Self as TryFrom<&[u8]>>::Error::InvalidObject)?,
+            ))),
+            _ => Err(<Self as TryFrom<&[u8]>>::Error::InvalidDataType),
         }
     }
 }
 
 /// A command sent by a client
-pub struct Command {
-    command_type: CommandType,
+#[derive(Debug)]
+pub enum Command {
+    /// Get data from a specific key
+    Get(Key),
+    /// Sets data on a specific key
+    Set(Key, Object),
 }
 
 impl TryFrom<&[u8]> for Command {
-    type Error = RecieveError;
+    type Error = CommandError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let bytes = value.as_ref();
-
-        if bytes.is_empty() {
+        if value.is_empty() {
             return Err(<Self as TryFrom<&[u8]>>::Error::ZeroLen);
         }
 
-        let command_type = bytes[0].try_into()?;
+        let command_type = value[0].try_into()?;
 
         Ok(Self { command_type })
     }
@@ -64,7 +83,7 @@ pub trait CommandHandler {
 /// Represents some connection to the server
 pub trait Connection {
     /// Retrieve command from a connection from a client
-    fn recieve(&mut self) -> Result<Command, RecieveError>;
+    fn recieve(&mut self) -> Result<Command, CommandError>;
 
     /// Send data to connection
     fn send(&self);

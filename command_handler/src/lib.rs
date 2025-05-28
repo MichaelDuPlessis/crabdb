@@ -1,5 +1,7 @@
 //! This module is responsible for handling recieving of commands and the sending of data
 
+use std::io::BufRead;
+
 mod tcp_command_handler;
 
 /// The kinds of errors that can occur when recieving a command
@@ -15,11 +17,23 @@ pub enum CommandError {
     InvalidObject,
     /// The data type specified is invalid
     InvalidDataType,
+    /// The key is invalid such as not being a valid utf8 string
+    InvalidKey,
 }
 
 /// A key used to identify an object in the DB
 #[derive(Debug)]
 pub struct Key(String);
+
+impl TryFrom<&[u8]> for Key {
+    type Error = CommandError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        str::from_utf8(value)
+            .map(|s| Self(s.to_string()))
+            .map_err(|_| Self::Error::InvalidKey)
+    }
+}
 
 /// An object stored in the database
 #[derive(Debug)]
@@ -33,7 +47,7 @@ impl TryFrom<&[u8]> for Object {
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         // if the slice is empty than no Object can be derived from it
         if value.is_empty() {
-            return Err(<Self as TryFrom<&[u8]>>::Error::InvalidObject);
+            return Err(CommandError::InvalidObject);
         }
 
         // first determine what data type is being used
@@ -43,9 +57,9 @@ impl TryFrom<&[u8]> for Object {
             0 => Ok(Self::Int(i64::from_be_bytes(
                 value[1..]
                     .try_into()
-                    .map_err(|_| <Self as TryFrom<&[u8]>>::Error::InvalidObject)?,
+                    .map_err(|_| Self::Error::InvalidObject)?,
             ))),
-            _ => Err(<Self as TryFrom<&[u8]>>::Error::InvalidDataType),
+            _ => Err(Self::Error::InvalidDataType),
         }
     }
 }
@@ -64,12 +78,13 @@ impl TryFrom<&[u8]> for Command {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.is_empty() {
-            return Err(<Self as TryFrom<&[u8]>>::Error::ZeroLen);
+            return Err(Self::Error::ZeroLen);
         }
 
-        let command_type = value[0].try_into()?;
+        // splitting the byte input by " "
+        let inputs = value.split(|v| *v == b' ');
 
-        Ok(Self { command_type })
+        todo!()
     }
 }
 

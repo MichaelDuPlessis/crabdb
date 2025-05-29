@@ -8,7 +8,7 @@ mod tcp_command_handler;
 #[derive(Debug)]
 pub enum CommandError {
     /// The command type requested is invalid
-    InvalidCommandType,
+    InvalidCommand,
     /// Failed to recieve data from client
     RecieveFailed,
     /// No data was recieved
@@ -73,6 +73,23 @@ pub enum Command {
     Set(Key, Object),
 }
 
+impl Command {
+    /// Create a Get command from a &[&[u8]]
+    fn get_from_slices<'a>(
+        slices: &[&'a [u8]],
+    ) -> Result<Self, <Self as TryFrom<&'a [u8]>>::Error> {
+        // Get only supports one operand
+        if slices.len() != 1 {
+            return Err(<Self as TryFrom<&[u8]>>::Error::InvalidKey);
+        }
+
+        let key = Key::try_from(slices[0])?;
+        Ok(Self::Get(key))
+    }
+}
+
+// Structure of command
+// | 1 byte command type | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the bytes data |
 impl TryFrom<&[u8]> for Command {
     type Error = CommandError;
 
@@ -82,9 +99,19 @@ impl TryFrom<&[u8]> for Command {
         }
 
         // splitting the byte input by " "
-        let inputs = value.split(|v| *v == b' ');
+        let inputs = value.split(|v| *v == b' ').collect::<Vec<_>>();
 
-        todo!()
+        // first figure out what kind of command is being sent
+        let command_type = inputs[0];
+        // all command types are exactl 1 byte
+        if command_type.len() != 1 {
+            return Err(Self::Error::InvalidCommand);
+        }
+        let command_type = command_type[0];
+
+        match command_type {
+            _ => Err(CommandError::InvalidCommand),
+        }
     }
 }
 

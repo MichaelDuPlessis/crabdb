@@ -95,6 +95,7 @@ impl Command {
 
         match command_type {
             0 => Self::get_from_slices(&slice[1..]),
+            1 => Self::set_from_slices(&slice[1..]),
             _ => Err(<Self as TryFrom<&'a [u8]>>::Error::InvalidType),
         }
     }
@@ -107,6 +108,19 @@ impl Command {
         let key = Key::try_from(&slice[..key_length as usize])?;
 
         Ok(Self::Get(key))
+    }
+
+    /// Create a Set command from a &[u8]
+    fn set_from_slices<'a>(slice: &'a [u8]) -> Result<Self, <Self as TryFrom<&'a [u8]>>::Error> {
+        // first get the key length
+        let key_length = u16::from_be_bytes(slice[..KEY_LEN].try_into().unwrap()) as usize;
+        // getting the key
+        let key = Key::try_from(&slice[..key_length])?;
+
+        // getting the object
+        let object = Object::try_from(&slice[KEY_LEN + key_length..])?;
+
+        Ok(Self::Set(key, object))
     }
 }
 

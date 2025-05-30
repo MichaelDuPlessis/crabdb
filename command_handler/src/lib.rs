@@ -1,18 +1,16 @@
 //! This module is responsible for handling recieving of commands and the sending of data
 
-use std::io::BufRead;
-
 mod tcp_command_handler;
 
 /// The kinds of errors that can occur when recieving a command
 #[derive(Debug)]
 pub enum CommandError {
     /// The command type requested is invalid
-    InvalidCommand,
+    InvalidType,
     /// Failed to recieve data from client
     RecieveFailed,
-    /// No data was recieved
-    ZeroLen,
+    /// The data recieved was not compelete
+    Incomplete,
     /// The object provided was invalid such as being malformed or have a lenght of 0
     InvalidObject,
     /// The data type specified is invalid
@@ -64,54 +62,76 @@ impl TryFrom<&[u8]> for Object {
     }
 }
 
+/// The number of bytes used to represent the command length
+const COMMAND_LEN: usize = 8;
+/// The number of bytes used to represent the key length
+const KEY_LEN: usize = 2;
+/// The number of bytes used to represent the data type
+const DATA_TYPE_LEN: usize = 1;
+/// The number of bytes used to represent the command type
+const COMMAND_TYPE_LEN: usize = 1;
+/// The minimum length of a data packet
+const MINIMUM_NUM_BYTES: usize = COMMAND_LEN + COMMAND_TYPE_LEN;
+
 /// A command sent by a client
 #[derive(Debug)]
 pub enum Command {
     /// Get data from a specific key
+    // | 2 bytes key length (n) | n bytes key |
     Get(Key),
     /// Sets data on a specific key
+    // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the bytes data |
     Set(Key, Object),
 }
 
 impl Command {
-    /// Create a Get command from a &[&[u8]]
-    fn get_from_slices<'a>(
-        slices: &[&'a [u8]],
+    /// Decides what command it is and builds is
+    fn create_command_from_slice<'a>(
+        slice: &'a [u8],
     ) -> Result<Self, <Self as TryFrom<&'a [u8]>>::Error> {
-        // Get only supports one operand
-        if slices.len() != 1 {
-            return Err(<Self as TryFrom<&[u8]>>::Error::InvalidKey);
-        }
+        // getting command type byte
+        // it is assumed it is valid to index
+        let command_type = slice[0];
 
-        let key = Key::try_from(slices[0])?;
+        match command_type {
+            0 => Self::get_from_slices(&slice[1..]),
+            _ => Err(<Self as TryFrom<&'a [u8]>>::Error::InvalidType),
+        }
+    }
+
+    /// Create a Get command from a &[u8]
+    fn get_from_slices<'a>(slice: &'a [u8]) -> Result<Self, <Self as TryFrom<&'a [u8]>>::Error> {
+        // first get the key length
+        let key_length = u16::from_be_bytes(slice[..KEY_LEN].try_into().unwrap());
+        // getting the key
+        let key = Key::try_from(&slice[..key_length as usize])?;
+
         Ok(Self::Get(key))
     }
 }
 
 // Structure of command
-// | 1 byte command type | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the bytes data |
+// | 8 bytes length of data to be received including these bytes | 1 byte command type |
 impl TryFrom<&[u8]> for Command {
     type Error = CommandError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.is_empty() {
-            return Err(Self::Error::ZeroLen);
+        // if the number of bytes is less than the command length + the key length + the data type length + the command type length then not enough data was recieved
+        if value.len() < MINIMUM_NUM_BYTES {
+            return Err(Self::Error::Incomplete);
         }
 
-        // splitting the byte input by " "
-        let inputs = value.split(|v| *v == b' ').collect::<Vec<_>>();
+        // getting the size of the data packet
+        let packet_size = u64::from_be_bytes(value[..COMMAND_LEN].try_into().unwrap()); // unwrapping is save since min size was already determined
+        // the rest of the data
+        let rest = &value[..COMMAND_LEN];
 
-        // first figure out what kind of command is being sent
-        let command_type = inputs[0];
-        // all command types are exactl 1 byte
-        if command_type.len() != 1 {
-            return Err(Self::Error::InvalidCommand);
+        // making sure all data was sent since data received should be the same size
+        if value.len() != packet_size as usize {
+            return Err(Self::Error::Incomplete);
         }
-        let command_type = command_type[0];
 
-        match command_type {
-            _ => Err(CommandError::InvalidCommand),
-        }
+        Self::create_command_from_slice(rest)
     }
 }
 

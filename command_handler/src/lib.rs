@@ -49,11 +49,11 @@ impl TryFrom<&[u8]> for Object {
         }
 
         // first determine what data type is being used
-        let d_type = value[0];
+        let d_type = DataTypeType::from_be_bytes(value[..DATA_TYPE_LEN].try_into().unwrap());
 
         match d_type {
             0 => Ok(Self::Int(i64::from_be_bytes(
-                value[1..]
+                value[DATA_TYPE_LEN..]
                     .try_into()
                     .map_err(|_| Self::Error::InvalidObject)?,
             ))),
@@ -62,16 +62,25 @@ impl TryFrom<&[u8]> for Object {
     }
 }
 
+/// The type of the number used to store the command length
+type CommandType = u64;
 /// The number of bytes used to represent the command length
-const COMMAND_LEN: usize = 8;
+const COMMAND_LEN: usize = std::mem::size_of::<CommandType>();
+
+/// The type of the number used to store the key length
+type KeyType = u16;
 /// The number of bytes used to represent the key length
-const KEY_LEN: usize = 2;
-/// The number of bytes used to represent the data type
-const DATA_TYPE_LEN: usize = 1;
+const KEY_LEN: usize = std::mem::size_of::<KeyType>();
+
+/// The type of the number used to store the data type
+type CommandOpType = u8;
 /// The number of bytes used to represent the command type
-const COMMAND_TYPE_LEN: usize = 1;
-/// The minimum length of a data packet
-const MINIMUM_NUM_BYTES: usize = COMMAND_LEN + COMMAND_TYPE_LEN;
+const COMMAND_OP_LEN: usize = std::mem::size_of::<CommandOpType>();
+
+/// The type of the number used to store the data type
+type DataTypeType = u8;
+/// The number of bytes used to represent the data type
+const DATA_TYPE_LEN: usize = std::mem::size_of::<DataTypeType>();
 
 /// A command sent by a client
 #[derive(Debug)]
@@ -88,7 +97,7 @@ impl Command {
     /// Create a Get command from a &[u8]
     fn get_from_slices<'a>(slice: &'a [u8]) -> Result<Self, <Self as TryFrom<&'a [u8]>>::Error> {
         // first get the key length
-        let key_length = u16::from_be_bytes(slice[..KEY_LEN].try_into().unwrap());
+        let key_length = KeyType::from_be_bytes(slice[..KEY_LEN].try_into().unwrap());
         // getting the key
         let key = Key::try_from(&slice[..key_length as usize])?;
 
@@ -98,7 +107,7 @@ impl Command {
     /// Create a Set command from a &[u8]
     fn set_from_slices<'a>(slice: &'a [u8]) -> Result<Self, <Self as TryFrom<&'a [u8]>>::Error> {
         // first get the key length
-        let key_length = u16::from_be_bytes(slice[..KEY_LEN].try_into().unwrap()) as usize;
+        let key_length = KeyType::from_be_bytes(slice[..KEY_LEN].try_into().unwrap()) as usize;
         // getting the key
         let key = Key::try_from(&slice[..key_length])?;
 
@@ -117,11 +126,12 @@ impl TryFrom<&[u8]> for Command {
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         // getting command type byte
         // it is assumed it is valid to index
-        let command_type = value[0];
+        let command_type =
+            CommandOpType::from_be_bytes(value[..COMMAND_OP_LEN].try_into().unwrap());
 
         match command_type {
-            0 => Self::get_from_slices(&value[1..]),
-            1 => Self::set_from_slices(&value[1..]),
+            0 => Self::get_from_slices(&value[COMMAND_OP_LEN..]),
+            1 => Self::set_from_slices(&value[COMMAND_OP_LEN..]),
             _ => Err(Self::Error::InvalidType),
         }
     }

@@ -31,7 +31,8 @@ impl crate::Connection for TcpStream {
             .map_err(|_| crate::CommandError::RecieveFailed)?;
 
         let command_len =
-            u64::from_be_bytes(buffer[..crate::COMMAND_LEN].try_into().unwrap()) as usize;
+            crate::CommandType::from_be_bytes(buffer[..crate::COMMAND_LEN].try_into().unwrap())
+                as usize;
 
         // read until all the data from the command has been recieved
         let _ = self

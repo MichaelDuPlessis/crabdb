@@ -85,21 +85,6 @@ pub enum Command {
 }
 
 impl Command {
-    /// Decides what command it is and builds is
-    fn create_command_from_slice<'a>(
-        slice: &'a [u8],
-    ) -> Result<Self, <Self as TryFrom<&'a [u8]>>::Error> {
-        // getting command type byte
-        // it is assumed it is valid to index
-        let command_type = slice[0];
-
-        match command_type {
-            0 => Self::get_from_slices(&slice[1..]),
-            1 => Self::set_from_slices(&slice[1..]),
-            _ => Err(<Self as TryFrom<&'a [u8]>>::Error::InvalidType),
-        }
-    }
-
     /// Create a Get command from a &[u8]
     fn get_from_slices<'a>(slice: &'a [u8]) -> Result<Self, <Self as TryFrom<&'a [u8]>>::Error> {
         // first get the key length
@@ -130,22 +115,15 @@ impl TryFrom<&[u8]> for Command {
     type Error = CommandError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        // if the number of bytes is less than the command length + the key length + the data type length + the command type length then not enough data was recieved
-        if value.len() < MINIMUM_NUM_BYTES {
-            return Err(Self::Error::Incomplete);
+        // getting command type byte
+        // it is assumed it is valid to index
+        let command_type = value[0];
+
+        match command_type {
+            0 => Self::get_from_slices(&value[1..]),
+            1 => Self::set_from_slices(&value[1..]),
+            _ => Err(Self::Error::InvalidType),
         }
-
-        // getting the size of the data packet
-        let packet_size = u64::from_be_bytes(value[..COMMAND_LEN].try_into().unwrap()); // unwrapping is save since min size was already determined
-        // the rest of the data
-        let rest = &value[..COMMAND_LEN];
-
-        // making sure all data was sent since data received should be the same size
-        if value.len() != packet_size as usize {
-            return Err(Self::Error::Incomplete);
-        }
-
-        Self::create_command_from_slice(rest)
     }
 }
 

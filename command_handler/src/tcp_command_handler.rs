@@ -5,6 +5,9 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
+/// The maximum number of bytes that can be read
+const BUFFER_SIZE: usize = 1024;
+
 /// The struct responsible for handeling commands over tcp
 pub struct TcpCommandHandler {
     listener: TcpListener,
@@ -19,16 +22,23 @@ impl crate::CommandHandler for TcpCommandHandler {
 
 // implementing Connection for a tcp stream
 impl crate::Connection for TcpStream {
-    fn recieve(&mut self) -> Result<crate::Command, crate::RecieveError> {
+    fn recieve(&mut self) -> Result<crate::Command, crate::CommandError> {
         // buffer to read into
-        // TODO: Use with_capacity instead
-        let buffer = &mut Vec::new();
+        let mut buffer = [0; BUFFER_SIZE];
 
         let _ = self
-            .read_to_end(buffer)
-            .map_err(|_| crate::RecieveError::RecieveFailed)?;
+            .read_exact(&mut buffer[..crate::COMMAND_LEN])
+            .map_err(|_| crate::CommandError::RecieveFailed)?;
 
-        todo!()
+        let command_len =
+            u64::from_be_bytes(buffer[..crate::COMMAND_LEN].try_into().unwrap()) as usize;
+
+        // read until all the data from the command has been recieved
+        let _ = self
+            .read_exact(&mut buffer[..command_len])
+            .map_err(|_| crate::CommandError::RecieveFailed)?;
+
+        crate::Command::try_from(&buffer[..command_len])
     }
 
     fn send(&self) {

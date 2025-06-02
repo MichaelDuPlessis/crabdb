@@ -2,15 +2,38 @@
 
 use std::{
     io::Read,
-    net::{TcpListener, TcpStream},
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
 };
 
 /// The maximum number of bytes that can be read
 const BUFFER_SIZE: usize = 1024;
 
+/// The default port to listen on
+const DEFAULT_PORT: u16 = 7227;
+/// The default ip address to listen for incomming connectons on
+const DEFAULT_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
+/// The default socket address to listen on
+const DEFAULT_SOCKET_ADDRESS: SocketAddr = SocketAddr::new(DEFAULT_IP, DEFAULT_PORT);
+
 /// The struct responsible for handeling commands over tcp
 pub struct TcpCommandHandler {
     listener: TcpListener,
+}
+
+impl TcpCommandHandler {
+    // Create a new command handler
+    pub fn new<A: ToSocketAddrs>(addr: A) -> Self {
+        Self {
+            // TODO: Add error handling
+            listener: TcpListener::bind(addr).unwrap(),
+        }
+    }
+}
+
+impl Default for TcpCommandHandler {
+    fn default() -> Self {
+        Self::new(DEFAULT_SOCKET_ADDRESS)
+    }
 }
 
 impl crate::CommandHandler for TcpCommandHandler {

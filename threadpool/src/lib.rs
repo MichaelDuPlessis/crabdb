@@ -45,7 +45,7 @@ impl<T> Queue<T> {
 
     /// Returns true if the queue has no elements otherwise false
     fn is_empty(&self) -> bool {
-        self.container.len() == 0
+        self.len() == 0
     }
 }
 
@@ -85,6 +85,11 @@ impl Worker {
         });
 
         Self { thread }
+    }
+
+    /// Wait for the threaed to finish executing
+    fn join(self) {
+        self.thread.join().unwrap();
     }
 }
 
@@ -132,6 +137,13 @@ impl ThreadPool {
 
         // notifying a thread
         cvar.notify_one();
+    }
+
+    /// Wait for all threads for finish executing
+    pub fn join(self) {
+        for worker in self.workers {
+            worker.join();
+        }
     }
 }
 

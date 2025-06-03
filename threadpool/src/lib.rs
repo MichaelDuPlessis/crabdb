@@ -98,7 +98,9 @@ pub struct ThreadPool {
 
 impl ThreadPool {
     /// Create a new threadpool with the specified number of threads
-    pub fn new(num_threads: usize) -> Self {
+    pub fn new(num_threads: NonZero<usize>) -> Self {
+        let num_threads = num_threads.get();
+
         let queue = Queue::new();
         let job_signal = Arc::new((Mutex::new(queue), Condvar::new()));
         let mut workers = Vec::with_capacity(num_threads);
@@ -120,5 +122,11 @@ impl ThreadPool {
     where
         F: FnOnce() -> () + Send + 'static,
     {
+    }
+}
+
+impl Default for ThreadPool {
+    fn default() -> Self {
+        Self::new(DEFAULT_NUM_THREADS)
     }
 }

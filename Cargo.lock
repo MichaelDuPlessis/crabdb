@@ -16,3 +16,7 @@ dependencies = [
 [[package]]
 name = "storage"
 version = "0.1.0"
+
+[[package]]
+name = "threadpool"
+version = "0.1.0"

@@ -122,6 +122,16 @@ impl ThreadPool {
     where
         F: FnOnce() -> () + Send + 'static,
     {
+        let (lock, cvar) = &*self.job_signal;
+        // adding job to queue
+        let job = Box::new(func);
+        let mut queue = lock.lock().unwrap();
+        queue.enqueue(job);
+        // unlocking mutex
+        drop(queue);
+
+        // notifying a thread
+        cvar.notify_one();
     }
 }
 

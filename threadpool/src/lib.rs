@@ -8,6 +8,12 @@ use std::{
 /// The default number of threads for the threadpool
 const DEFAULT_NUM_THREADS: NonZero<usize> = unsafe { NonZero::new_unchecked(4) }; // TODO: Determine whether new(<num>).unwrap() is better
 
+/// A type alias for the object used for signaling the threads
+type Signal = Arc<(
+    Mutex<Queue<Box<dyn FnOnce() -> () + Send + 'static>>>,
+    Condvar,
+)>;
+
 /// A simple implementation of a fifo queue
 struct Queue<T> {
     /// The underlying data structure used for the queue
@@ -31,32 +37,61 @@ impl<T> Queue<T> {
     fn dequeue(&mut self) -> Option<T> {
         self.container.pop_front()
     }
+
+    /// Returns the number of items in the queue
+    fn len(&self) -> usize {
+        self.container.len()
+    }
+
+    /// Returns true if the queue has no elements otherwise false
+    fn is_empty(&self) -> bool {
+        self.container.len() == 0
+    }
 }
 
 /// A worker represents a thread
 struct Worker {
-    /// Used to signal to the thread that is should wake up
-    job_signal: Arc<(Mutex<()>, Condvar)>,
     /// The thread that the worker manages
     thread: thread::JoinHandle<()>,
 }
 
 impl Worker {
     /// Creates a new worker
-    fn new(signal: Arc<(Mutex<()>, Condvar)>) -> Self {
-        let thread = thread::spawn(|| {});
+    fn new(job_signal: Signal) -> Self {
+        let thread = thread::spawn(move || {
+            loop {
+                // getting the job
+                let job = {
+                    // aquiring lock
+                    let (lock, cvar) = &*job_signal;
 
-        Self {
-            job_signal: signal,
-            thread,
-        }
+                    // aquiring queue
+                    let mut queue = lock.lock().unwrap();
+
+                    // making sure there is a job to execute
+                    while queue.is_empty() {
+                        queue = cvar.wait(queue).unwrap();
+                    }
+
+                    // getting the job
+                    let job = queue.dequeue();
+                    job
+                };
+
+                if let Some(job) = job {
+                    job();
+                }
+            }
+        });
+
+        Self { thread }
     }
 }
 
 /// A threadpool
 pub struct ThreadPool {
     /// Used to single to the threads that there is new code to be executed
-    job_signal: Arc<(Mutex<()>, Condvar)>,
+    job_signal: Signal,
     /// The workers belonging to the threadpool
     workers: Vec<Worker>,
 }
@@ -64,7 +99,8 @@ pub struct ThreadPool {
 impl ThreadPool {
     /// Create a new threadpool with the specified number of threads
     pub fn new(num_threads: usize) -> Self {
-        let job_signal = Arc::new((Mutex::new(()), Condvar::new()));
+        let queue = Queue::new();
+        let job_signal = Arc::new((Mutex::new(queue), Condvar::new()));
         let mut workers = Vec::with_capacity(num_threads);
 
         // creating the worker threads

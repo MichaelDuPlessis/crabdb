@@ -8,11 +8,16 @@ use std::{
 /// The default number of threads for the threadpool
 const DEFAULT_NUM_THREADS: NonZero<usize> = unsafe { NonZero::new_unchecked(4) }; // TODO: Determine whether new(<num>).unwrap() is better
 
+/// The kinds of signals that can be sent to threads
+enum Signal {
+    /// There is a job to process
+    Job(Box<dyn FnOnce() -> () + Send + 'static>),
+    /// The thread should shutdown
+    Shutdown,
+}
+
 /// A type alias for the object used for signaling the threads
-type Signal = Arc<(
-    Mutex<Queue<Box<dyn FnOnce() -> () + Send + 'static>>>,
-    Condvar,
-)>;
+type JobSignal = Arc<(Mutex<Queue<Signal>>, Condvar)>;
 
 /// A simple implementation of a fifo queue
 struct Queue<T> {
@@ -57,11 +62,11 @@ struct Worker {
 
 impl Worker {
     /// Creates a new worker
-    fn new(job_signal: Signal) -> Self {
+    fn new(job_signal: JobSignal) -> Self {
         let thread = thread::spawn(move || {
             loop {
                 // getting the job
-                let job = {
+                let signal = {
                     // aquiring lock
                     let (lock, cvar) = &*job_signal;
 
@@ -74,12 +79,17 @@ impl Worker {
                     }
 
                     // getting the job
-                    let job = queue.dequeue();
-                    job
+                    let signal = queue.dequeue();
+                    signal
                 };
 
-                if let Some(job) = job {
-                    job();
+                if let Some(signal) = signal {
+                    match signal {
+                        // run the job
+                        Signal::Job(job) => job(),
+                        // shutdown the thread
+                        Signal::Shutdown => break,
+                    }
                 }
             }
         });
@@ -96,7 +106,7 @@ impl Worker {
 /// A threadpool
 pub struct ThreadPool {
     /// Used to single to the threads that there is new code to be executed
-    job_signal: Signal,
+    job_signal: JobSignal,
     /// The workers belonging to the threadpool
     workers: Vec<Worker>,
 }
@@ -122,16 +132,12 @@ impl ThreadPool {
         }
     }
 
-    /// Send a function to be excecuted on the threadpool
-    pub fn execute<F>(&mut self, func: F)
-    where
-        F: FnOnce() -> () + Send + 'static,
-    {
+    /// sends a signal to the worker threads
+    fn send_signal(&mut self, signal: Signal) {
         let (lock, cvar) = &*self.job_signal;
         // adding job to queue
-        let job = Box::new(func);
         let mut queue = lock.lock().unwrap();
-        queue.enqueue(job);
+        queue.enqueue(signal);
         // unlocking mutex
         drop(queue);
 
@@ -139,8 +145,23 @@ impl ThreadPool {
         cvar.notify_one();
     }
 
+    /// Send a function to be excecuted on the threadpool
+    pub fn execute<F>(&mut self, func: F)
+    where
+        F: FnOnce() -> () + Send + 'static,
+    {
+        let job = Box::new(func);
+        self.send_signal(Signal::Job(job));
+    }
+
     /// Wait for all threads for finish executing
-    pub fn join(self) {
+    pub fn join(mut self) {
+        // sending signals equal to the number of workers to shutdown
+        for _ in 0..self.workers.len() {
+            self.send_signal(Signal::Shutdown);
+        }
+
+        // waiting for workers to finish
         for worker in self.workers {
             worker.join();
         }

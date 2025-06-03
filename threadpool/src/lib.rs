@@ -16,10 +16,20 @@ enum Signal {
     Shutdown,
 }
 
+impl std::fmt::Debug for Signal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Signal::Job(_) => write!(f, "Job(<closure>)"),
+            Signal::Shutdown => write!(f, "Shutdown"),
+        }
+    }
+}
+
 /// A type alias for the object used for signaling the threads
 type JobSignal = Arc<(Mutex<Queue<Signal>>, Condvar)>;
 
 /// A simple implementation of a fifo queue
+#[derive(Debug)]
 struct Queue<T> {
     /// The underlying data structure used for the queue
     container: VecDeque<T>, // TODO: Is a VecDeque the best container to use?
@@ -55,6 +65,7 @@ impl<T> Queue<T> {
 }
 
 /// A worker represents a thread
+#[derive(Debug)]
 struct Worker {
     /// The thread that the worker manages
     thread: thread::JoinHandle<()>,
@@ -104,6 +115,7 @@ impl Worker {
 }
 
 /// A threadpool
+#[derive(Debug)]
 pub struct ThreadPool {
     /// Used to single to the threads that there is new code to be executed
     job_signal: JobSignal,

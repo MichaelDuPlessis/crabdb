@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 command_handler = { path = "../command_handler" }
+threadpool = { path = "../threadpool" }

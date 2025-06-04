@@ -121,6 +121,8 @@ pub struct ThreadPool {
     job_signal: JobSignal,
     /// The workers belonging to the threadpool
     workers: Vec<Worker>,
+    /// The number of workers that the threadpool has
+    num_workers: usize,
 }
 
 impl ThreadPool {
@@ -141,6 +143,7 @@ impl ThreadPool {
         Self {
             job_signal,
             workers,
+            num_workers: num_threads,
         }
     }
 
@@ -178,10 +181,54 @@ impl ThreadPool {
             worker.join();
         }
     }
+
+    /// Get the number of workers the threadpool has
+    pub fn num_workers(&self) -> usize {
+        self.workers.len()
+    }
 }
 
 impl Default for ThreadPool {
     fn default() -> Self {
         Self::new(DEFAULT_NUM_THREADS)
+    }
+}
+
+// tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tests spawning multiple threads that all increment a counter
+    #[test]
+    fn counter() {
+        // the target for the counter
+        const TARGET: usize = 1000;
+        // the counter variable
+        let counter = Arc::new(Mutex::new(0));
+
+        let mut threadpool = ThreadPool::default();
+
+        for _ in 0..threadpool.num_workers() {
+            let counter = Arc::clone(&counter);
+
+            threadpool.execute(move || {
+                loop {
+                    {
+                        let mut counter = counter.lock().unwrap();
+                        if *counter < TARGET {
+                            *counter += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            });
+        }
+
+        threadpool.join();
+
+        let counter = counter.lock().unwrap();
+        assert_eq!(*counter, TARGET);
     }
 }

@@ -37,7 +37,9 @@ impl Default for TcpCommandHandler {
 }
 
 impl crate::CommandHandler for TcpCommandHandler {
-    fn listen(&self) -> impl crate::Connection {
+    type Handler = TcpStream;
+
+    fn listen(&self) -> Self::Handler {
         // TODO: Add error handling
         self.listener.accept().map(|(stream, _)| stream).unwrap()
     }

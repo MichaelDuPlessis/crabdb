@@ -142,9 +142,11 @@ impl TryFrom<&[u8]> for Command {
 
 /// All methods that a command handler must implement to be usable
 pub trait CommandHandler {
+    type Handler: Connection;
+
     /// The CommandHandler just needs to be able to listen for commands
     /// it is then responsible for processing the commands and returning a response
-    fn listen(&self) -> impl Connection;
+    fn listen(&self) -> Self::Handler;
 }
 
 /// Represents some connection to the server

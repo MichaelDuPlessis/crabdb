@@ -1,4 +1,4 @@
-use command_handler::{CommandHandler, tcp_command_handler::TcpCommandHandler};
+use command_handler::{CommandHandler, Connection, tcp_command_handler::TcpCommandHandler};
 use threadpool::ThreadPool;
 
 fn main() {
@@ -10,11 +10,21 @@ fn main() {
 
     // loop forever for incomming connections
     loop {
-        let connetion = command_handler.listen();
+        let mut connection = command_handler.listen();
 
         // when a connection is recieved send it to the threadpool
-        threadpool.execute(|| {
-            println!("Connection recieved");
+        threadpool.execute(move || {
+            loop {
+                let command = match connection.recieve() {
+                    Ok(command) => command,
+                    Err(err) => {
+                        println!("An error occured: {:?}", err);
+                        break;
+                    }
+                };
+
+                println!("Command recieved: {:?}", command);
+            }
         });
     }
 }

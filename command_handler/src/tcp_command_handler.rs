@@ -49,8 +49,7 @@ impl crate::Connection for TcpStream {
         // buffer to read into
         let mut buffer = [0; BUFFER_SIZE];
 
-        let _ = self
-            .read_exact(&mut buffer[..crate::COMMAND_LEN])
+        self.read_exact(&mut buffer[..crate::COMMAND_LEN])
             .map_err(|_| crate::CommandError::RecieveFailed)?;
 
         let command_len =
@@ -58,8 +57,7 @@ impl crate::Connection for TcpStream {
                 as usize;
 
         // read until all the data from the command has been recieved
-        let _ = self
-            .read_exact(&mut buffer[..command_len])
+        self.read_exact(&mut buffer[..command_len])
             .map_err(|_| crate::CommandError::RecieveFailed)?;
 
         crate::Command::try_from(&buffer[..command_len])

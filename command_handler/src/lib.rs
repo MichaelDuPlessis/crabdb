@@ -62,22 +62,22 @@ impl TryFrom<&[u8]> for Object {
     }
 }
 
-/// The type of the number used to store the command length
+/// The data type of the number used to store the command length
 type CommandType = u64;
 /// The number of bytes used to represent the command length
 const COMMAND_LEN: usize = std::mem::size_of::<CommandType>();
 
-/// The type of the number used to store the key length
+/// The data type of the number used to store the key length
 type KeyType = u16;
 /// The number of bytes used to represent the key length
 const KEY_LEN: usize = std::mem::size_of::<KeyType>();
 
-/// The type of the number used to store the data type
+/// The data type of the number used to store the data type
 type CommandOpType = u8;
 /// The number of bytes used to represent the command type
 const COMMAND_OP_LEN: usize = std::mem::size_of::<CommandOpType>();
 
-/// The type of the number used to store the data type
+/// The data type of the number used to store the data type
 type DataTypeType = u8;
 /// The number of bytes used to represent the data type
 const DATA_TYPE_LEN: usize = std::mem::size_of::<DataTypeType>();
@@ -91,6 +91,8 @@ pub enum Command {
     /// Sets data on a specific key
     // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the bytes data |
     Set(Key, Object),
+    /// The connection is closed
+    Terminated,
 }
 
 impl Command {
@@ -132,6 +134,7 @@ impl TryFrom<&[u8]> for Command {
         match command_type {
             0 => Self::get_from_slices(&value[COMMAND_OP_LEN..]),
             1 => Self::set_from_slices(&value[COMMAND_OP_LEN..]),
+            2 => Ok(Self::Terminated),
             _ => Err(Self::Error::InvalidType),
         }
     }

@@ -1,35 +1,20 @@
-/// What items are stored under in the database
-// TODO: I don't care about the capacity of the string so maybe change to a len and u8 slice instead
-#[derive(Debug)]
-pub struct Key(String);
+use crab_core::{Key, Object};
 
-/// The Int data type. It is internally reprsented as an isize.
-#[derive(Debug)]
-pub struct Int(isize);
+mod in_memory_store;
 
-impl Int {
-    /// Creates a new Int from an isize
-    pub fn new(num: impl Into<isize>) -> Self {
-        Self(num.into())
-    }
-}
+/// The types of errors that can occur with a storage medium
+pub enum StorageError {}
 
-/// The Text data type. It is internally reprsented as an String.
-#[derive(Debug)]
-pub struct Text(String);
+type Result<T> = std::result::Result<T, StorageError>;
 
-impl Text {
-    /// Creates a new Text from a String
-    pub fn new(text: impl Into<String>) -> Self {
-        Self(text.into())
-    }
-}
+/// A common interface for storing items
+trait Storage {
+    /// Saves an object in the database under a Key
+    fn save(&mut self, key: Key, object: Object) -> Result<()>;
 
-/// The available data types for the database
-#[derive(Debug)]
-pub enum ObjectType {
-    Int(Int),
-    Text(Text),
-    // Struct,
-    // List,
+    /// Gets an object saved in the database under a key or none if the key is not found
+    fn retrieve(&self, key: impl AsRef<Key>) -> Result<Option<&Object>>;
+
+    /// Deletes an object from the database under a key and returns the object or none if the key is not found
+    fn delete(&mut self, key: impl AsRef<Key>) -> Result<Option<Object>>;
 }

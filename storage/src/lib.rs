@@ -1,14 +1,35 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+/// What items are stored under in the database
+// TODO: I don't care about the capacity of the string so maybe change to a len and u8 slice instead
+#[derive(Debug)]
+pub struct Key(String);
+
+/// The Int data type. It is internally reprsented as an isize.
+#[derive(Debug)]
+pub struct Int(isize);
+
+impl Int {
+    /// Creates a new Int from an isize
+    pub fn new(num: impl Into<isize>) -> Self {
+        Self(num.into())
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// The Text data type. It is internally reprsented as an String.
+#[derive(Debug)]
+pub struct Text(String);
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+impl Text {
+    /// Creates a new Text from a String
+    pub fn new(text: impl Into<String>) -> Self {
+        Self(text.into())
     }
+}
+
+/// The available data types for the database
+#[derive(Debug)]
+pub enum ObjectType {
+    Int(Int),
+    Text(Text),
+    // Struct,
+    // List,
 }

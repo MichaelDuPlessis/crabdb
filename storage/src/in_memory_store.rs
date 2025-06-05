@@ -23,9 +23,8 @@ impl Default for InMemoryStore {
 }
 
 impl Storage for InMemoryStore {
-    fn save(&mut self, key: Key, object: Object) -> crate::Result<()> {
-        self.map.insert(key, object);
-        Ok(())
+    fn save(&mut self, key: Key, object: Object) -> crate::Result<Option<Object>> {
+        Ok(self.map.insert(key, object))
     }
 
     fn retrieve(&self, key: impl AsRef<Key>) -> crate::Result<Option<&Object>> {

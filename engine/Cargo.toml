@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 server = { path = "../server" }
+storage = { path = "../storage" }
 threadpool = { path = "../threadpool" }

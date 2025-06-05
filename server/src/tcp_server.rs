@@ -15,6 +15,26 @@ const DEFAULT_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
 /// The default socket address to listen on
 const DEFAULT_SOCKET_ADDRESS: SocketAddr = SocketAddr::new(DEFAULT_IP, DEFAULT_PORT);
 
+/// The data type of the number used to store the command length
+type CommandLenType = u64;
+/// The number of bytes used to represent the command length
+const COMMAND_LEN: usize = std::mem::size_of::<CommandLenType>();
+
+/// The data type of the number used to store the key length
+type KeyType = u16;
+/// The number of bytes used to represent the key length
+const KEY_LEN: usize = std::mem::size_of::<KeyType>();
+
+/// The data type of the number used to store the data type
+type CommandOpType = u8;
+/// The number of bytes used to represent the command type
+const COMMAND_OP_LEN: usize = std::mem::size_of::<CommandOpType>();
+
+/// The data type of the number used to store the data type
+type DataTypeType = u8;
+/// The number of bytes used to represent the data type
+const DATA_TYPE_LEN: usize = std::mem::size_of::<DataTypeType>();
+
 /// The struct responsible for handeling commands over tcp
 pub struct TcpServer {
     listener: TcpListener,
@@ -45,24 +65,24 @@ impl crate::Server for TcpServer {
     }
 }
 
+// structure for a command over tcp is
+// | 8 bytes command length not including the first 8 bytes | 1 byte command type | rest command specific |
+
 // implementing Connection for a tcp stream
 impl crate::Connection for TcpStream {
     fn recieve(&mut self) -> Result<crate::Command, crate::CommandError> {
-        // buffer to read into
-        let mut buffer = [0; BUFFER_SIZE];
+        // first get the size of the payload
+        let mut buffer = [0; COMMAND_LEN];
+        self.read_exact(&mut buffer)
+            .map_err(|_| crate::CommandError::RecieveFailed)?;
+        let command_len = CommandLenType::from_be_bytes(buffer);
 
-        self.read_exact(&mut buffer[..crate::COMMAND_LEN])
+        // read the rest of the data
+        let mut buffer = vec![0; command_len as usize];
+        self.read_exact(&mut buffer)
             .map_err(|_| crate::CommandError::RecieveFailed)?;
 
-        let command_len =
-            crate::CommandType::from_be_bytes(buffer[..crate::COMMAND_LEN].try_into().unwrap())
-                as usize;
-
-        // read until all the data from the command has been recieved
-        self.read_exact(&mut buffer[..command_len])
-            .map_err(|_| crate::CommandError::RecieveFailed)?;
-
-        crate::Command::try_from(&buffer[..command_len])
+        todo!()
     }
 
     fn send(&self) {

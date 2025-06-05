@@ -1,5 +1,29 @@
 use server::{Connection, Server, tcp_server::TcpServer};
+use storage::Storage;
 use threadpool::ThreadPool;
+
+/// The engine of the database. It controls all the logic
+struct Engine<S: Server, D: Storage> {
+    server: S,
+    storage: D,
+}
+
+impl<S: Server, D: Storage> Engine<S, D> {
+    /// Creates a new Engine
+    fn new(server: S, storage: D) -> Self {
+        Self { server, storage }
+    }
+
+    /// Starts the server
+    fn start(&mut self) -> Result<(), ()> {
+        loop {
+            // waiting for a connection
+            let mut connection = self.server.listen();
+
+            // recieving data
+        }
+    }
+}
 
 fn main() {
     // instantiating the threadpool

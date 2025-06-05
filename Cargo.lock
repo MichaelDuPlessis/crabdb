@@ -11,12 +11,16 @@ name = "engine"
 version = "0.1.0"
 dependencies = [
  "server",
+ "storage",
  "threadpool",
 ]
 
 [[package]]
 name = "server"
 version = "0.1.0"
+dependencies = [
+ "crab-core",
+]
 
 [[package]]
 name = "storage"

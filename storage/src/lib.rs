@@ -8,7 +8,7 @@ pub enum StorageError {}
 type Result<T> = std::result::Result<T, StorageError>;
 
 /// A common interface for storing items
-trait Storage {
+pub trait Storage {
     /// Saves an object in the database under a Key and returns the old object under the key if there is one
     fn save(&mut self, key: Key, object: Object) -> Result<Option<Object>>;
 

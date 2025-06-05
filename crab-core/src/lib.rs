@@ -14,6 +14,12 @@ impl Int {
     }
 }
 
+impl From<isize> for Int {
+    fn from(value: isize) -> Self {
+        Self::new(value)
+    }
+}
+
 /// The Text data type. It is internally reprsented as an String.
 #[derive(Debug)]
 pub struct Text(String);
@@ -25,6 +31,12 @@ impl Text {
     }
 }
 
+impl From<String> for Text {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+
 /// The available data types for the database
 #[derive(Debug)]
 pub enum Object {
@@ -32,4 +44,22 @@ pub enum Object {
     Text(Text),
     // Struct,
     // List,
+}
+
+impl Object {
+    /// Creates a new Int type
+    pub fn new_int<T>(num: T) -> Self
+    where
+        T: Into<Int>,
+    {
+        Self::Int(num.into())
+    }
+
+    /// Creates a new Text type
+    pub fn new_text<T>(text: T) -> Self
+    where
+        T: Into<Text>,
+    {
+        Self::Text(text.into())
+    }
 }

@@ -1,6 +1,6 @@
 //! This module is responsible for handling recieving of commands and the sending of data
 
-pub mod tcp_command_handler;
+pub mod tcp_server;
 
 /// The kinds of errors that can occur when recieving a command
 #[derive(Debug)]
@@ -141,7 +141,7 @@ impl TryFrom<&[u8]> for Command {
 }
 
 /// All methods that a command handler must implement to be usable
-pub trait CommandHandler {
+pub trait Server {
     type Handler: Connection;
 
     /// The CommandHandler just needs to be able to listen for commands

@@ -3,10 +3,6 @@
 version = 4
 
 [[package]]
-name = "command_handler"
-version = "0.1.0"
-
-[[package]]
 name = "crab-core"
 version = "0.1.0"
 
@@ -14,9 +10,13 @@ version = "0.1.0"
 name = "engine"
 version = "0.1.0"
 dependencies = [
- "command_handler",
+ "server",
  "threadpool",
 ]
+
+[[package]]
+name = "server"
+version = "0.1.0"
 
 [[package]]
 name = "storage"

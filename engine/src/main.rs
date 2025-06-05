@@ -1,4 +1,4 @@
-use command_handler::{CommandHandler, Connection, tcp_command_handler::TcpCommandHandler};
+use server::{Connection, Server, tcp_server::TcpServer};
 use threadpool::ThreadPool;
 
 fn main() {
@@ -6,7 +6,7 @@ fn main() {
     let mut threadpool = ThreadPool::default();
 
     // first create a command handler
-    let command_handler = TcpCommandHandler::default();
+    let command_handler = TcpServer::default();
 
     // loop forever for incomming connections
     loop {

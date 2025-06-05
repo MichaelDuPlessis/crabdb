@@ -16,11 +16,11 @@ const DEFAULT_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
 const DEFAULT_SOCKET_ADDRESS: SocketAddr = SocketAddr::new(DEFAULT_IP, DEFAULT_PORT);
 
 /// The struct responsible for handeling commands over tcp
-pub struct TcpCommandHandler {
+pub struct TcpServer {
     listener: TcpListener,
 }
 
-impl TcpCommandHandler {
+impl TcpServer {
     // Create a new command handler
     pub fn new<A: ToSocketAddrs>(addr: A) -> Self {
         Self {
@@ -30,13 +30,13 @@ impl TcpCommandHandler {
     }
 }
 
-impl Default for TcpCommandHandler {
+impl Default for TcpServer {
     fn default() -> Self {
         Self::new(DEFAULT_SOCKET_ADDRESS)
     }
 }
 
-impl crate::CommandHandler for TcpCommandHandler {
+impl crate::Server for TcpServer {
     type Handler = TcpStream;
 
     fn listen(&self) -> Self::Handler {

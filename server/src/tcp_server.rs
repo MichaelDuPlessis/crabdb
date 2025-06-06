@@ -5,8 +5,9 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
 };
 
-/// The maximum number of bytes that can be read
-const BUFFER_SIZE: usize = 1024;
+use crab_core::Key;
+
+use crate::CommandError;
 
 /// The default port to listen on
 const DEFAULT_PORT: u16 = 7227;
@@ -77,15 +78,56 @@ impl crate::Connection for TcpStream {
             .map_err(|_| crate::CommandError::RecieveFailed)?;
         let command_len = CommandLenType::from_be_bytes(buffer);
 
+        // TODO: Add check to make sure that the command length is long enough to accomodate everything
+
         // read the rest of the data
         let mut buffer = vec![0; command_len as usize];
         self.read_exact(&mut buffer)
             .map_err(|_| crate::CommandError::RecieveFailed)?;
 
-        todo!()
+        crate::Command::try_from(buffer.as_slice())
     }
 
     fn send(&self) {
         todo!()
+    }
+}
+
+/// Converts a slice to a fixed size array unsafely
+unsafe fn slice_to_array<T, const S: usize>(slice: &[T]) -> [T; S]
+where
+    [T; S]: for<'a> TryFrom<&'a [T]>,
+{
+    unsafe { slice.try_into().unwrap_unchecked() }
+}
+
+/// Extracts the key, returning the key and a slice to data just after the key
+fn extract_key(buffer: &[u8]) -> Result<(Key, &[u8]), crate::CommandError> {
+    // first extract key length
+    if buffer.len() < KEY_LEN {
+        return Err(crate::CommandError::InvalidKey);
+    }
+    let key_len = KeyType::from_be_bytes(unsafe { slice_to_array(&buffer[..KEY_LEN]) });
+
+    todo!()
+}
+
+impl TryFrom<&[u8]> for crate::Command {
+    type Error = CommandError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        // first determine the tyep of command sent
+        let command_type =
+            CommandOpType::from_be_bytes(unsafe { slice_to_array(&value[..COMMAND_OP_LEN]) });
+
+        match command_type {
+            // GET
+            // | 2 bytes key length (n) | n bytes key |
+            0 => todo!(),
+            // SET
+            // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the data payload |
+            1 => todo!(),
+            _ => Err(CommandError::InvalidType),
+        }
     }
 }

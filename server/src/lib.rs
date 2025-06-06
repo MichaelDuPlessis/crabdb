@@ -7,7 +7,7 @@ pub mod tcp_server;
 /// The kinds of errors that can occur when recieving a command
 #[derive(Debug)]
 pub enum CommandError {
-    /// The command type requested is invalid
+    /// The command type sent is invalid
     InvalidType,
     /// Failed to recieve data from client
     RecieveFailed,
@@ -46,7 +46,7 @@ pub trait Server {
 
 /// Represents some connection to the server
 pub trait Connection {
-    /// Retrieve command from a connection from a client
+    /// Retrieve command from a connection from a client. This blocks until a command is received or the connection is closed
     fn recieve(&mut self) -> Result<Command, CommandError>;
 
     /// Send data to connection

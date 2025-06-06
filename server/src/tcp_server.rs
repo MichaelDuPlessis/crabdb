@@ -108,8 +108,12 @@ fn extract_key(buffer: &[u8]) -> Result<(Key, &[u8]), crate::CommandError> {
         return Err(crate::CommandError::InvalidKey);
     }
     let key_len = KeyType::from_be_bytes(unsafe { slice_to_array(&buffer[..KEY_LEN]) });
+    let key_end = KEY_LEN + key_len as usize;
+    let key =
+        str::from_utf8(&buffer[KEY_LEN..key_end]).map_err(|_| crate::CommandError::InvalidKey)?;
+    let key = Key::from(key);
 
-    todo!()
+    Ok((key, &buffer[key_end..]))
 }
 
 impl TryFrom<&[u8]> for crate::Command {
@@ -120,14 +124,14 @@ impl TryFrom<&[u8]> for crate::Command {
         let command_type =
             CommandOpType::from_be_bytes(unsafe { slice_to_array(&value[..COMMAND_OP_LEN]) });
 
-        match command_type {
+        Ok(match command_type {
             // GET
             // | 2 bytes key length (n) | n bytes key |
-            0 => todo!(),
+            0 => crate::Command::Get(extract_key(&value[COMMAND_OP_LEN..]).map(|(key, _)| key)?),
             // SET
             // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the data payload |
             1 => todo!(),
-            _ => Err(CommandError::InvalidType),
-        }
+            _ => return Err(CommandError::InvalidType),
+        })
     }
 }

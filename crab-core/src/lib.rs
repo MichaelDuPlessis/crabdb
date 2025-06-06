@@ -3,6 +3,22 @@
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Key(String);
 
+impl Key {
+    /// Create a new key from a type that can be converted into a String
+    pub fn new(key: impl Into<String>) -> Self {
+        Self(key.into())
+    }
+}
+
+impl<T> From<T> for Key
+where
+    T: Into<String>,
+{
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
 /// The Int data type. It is internally reprsented as an isize.
 #[derive(Debug)]
 pub struct Int(isize);

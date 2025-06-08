@@ -5,7 +5,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
 };
 
-use crab_core::Key;
+use crab_core::{Key, slice_to_array};
 
 use crate::CommandError;
 
@@ -30,11 +30,6 @@ const KEY_LEN: usize = std::mem::size_of::<KeyType>();
 type CommandOpType = u8;
 /// The number of bytes used to represent the command type
 const COMMAND_OP_LEN: usize = std::mem::size_of::<CommandOpType>();
-
-/// The data type of the number used to store the data type
-type DataTypeType = u8;
-/// The number of bytes used to represent the data type
-const DATA_TYPE_LEN: usize = std::mem::size_of::<DataTypeType>();
 
 /// The struct responsible for handeling commands over tcp
 pub struct TcpServer {
@@ -93,14 +88,6 @@ impl crate::Connection for TcpStream {
     }
 }
 
-/// Converts a slice to a fixed size array unsafely
-unsafe fn slice_to_array<T, const S: usize>(slice: &[T]) -> [T; S]
-where
-    [T; S]: for<'a> TryFrom<&'a [T]>,
-{
-    unsafe { slice.try_into().unwrap_unchecked() }
-}
-
 /// Extracts the key, returning the key and a slice to data just after the key
 fn extract_key(buffer: &[u8]) -> Result<(Key, &[u8]), crate::CommandError> {
     // first extract key length
@@ -130,7 +117,11 @@ impl TryFrom<&[u8]> for crate::Command {
             0 => crate::Command::Get(extract_key(&value[COMMAND_OP_LEN..]).map(|(key, _)| key)?),
             // SET
             // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the data payload |
-            1 => todo!(),
+            1 => {
+                let (key, value) = extract_key(&value[COMMAND_OP_LEN..])?;
+
+                todo!()
+            }
             _ => return Err(CommandError::InvalidType),
         })
     }

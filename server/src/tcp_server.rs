@@ -1,13 +1,11 @@
 //! Implements the command handler trait over tcp
 
+use crate::CommandError;
+use crab_core::{Key, slice_to_array};
 use std::{
     io::Read,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
 };
-
-use crab_core::{Key, slice_to_array};
-
-use crate::CommandError;
 
 /// The default port to listen on
 const DEFAULT_PORT: u16 = 7227;

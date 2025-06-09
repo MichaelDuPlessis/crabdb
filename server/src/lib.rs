@@ -1,13 +1,13 @@
-//! This module is responsible for handling recieving of commands and the sending of data
+//! This module is responsible for handling recieving of requests and the sending respones
 
 use crab_core::{Key, Object};
 
 pub mod tcp_server;
 
-/// The kinds of errors that can occur when recieving a command
+/// The kinds of errors that can occur when recieving a request
 #[derive(Debug)]
-pub enum CommandError {
-    /// The command type sent is invalid
+pub enum RecieveError {
+    /// The request type sent is invalid
     InvalidType,
     /// Failed to recieve data from client
     RecieveFailed,
@@ -21,9 +21,9 @@ pub enum CommandError {
     InvalidKey,
 }
 
-/// A command sent by a client
+/// A request sent by a client
 #[derive(Debug)]
-pub enum Command {
+pub enum Request {
     /// Get data from a specific key
     // | 2 bytes key length (n) | n bytes key |
     Get(Key),
@@ -34,20 +34,19 @@ pub enum Command {
     Terminated,
 }
 
-// Structure of command
-/// All methods that a command handler must implement to be usable
+/// All methods that a Server must implement to be usable
 pub trait Server {
     type Handler: Connection;
 
-    /// The CommandHandler just needs to be able to listen for commands
-    /// it is then responsible for processing the commands and returning a response
+    /// The request just needs to be able to listen for connections
+    /// it is then responsible for processing the requests and returning a response
     fn listen(&self) -> Self::Handler;
 }
 
 /// Represents some connection to the server
 pub trait Connection {
-    /// Retrieve command from a connection from a client. This blocks until a command is received or the connection is closed
-    fn recieve(&mut self) -> Result<Command, CommandError>;
+    /// Retrieve request from a connection from a client. This blocks until a request is received or the connection is closed
+    fn recieve(&mut self) -> Result<Request, RecieveError>;
 
     /// Send data to connection
     fn send(&self);

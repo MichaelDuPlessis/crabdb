@@ -1,6 +1,6 @@
-//! Implements the command handler trait over tcp
+//! Implements the Server trait over tcp
 
-use crate::CommandError;
+use crate::RecieveError;
 use crab_core::{Deserialize, Key, Object, slice_to_array};
 use std::{
     io::Read,
@@ -14,28 +14,23 @@ const DEFAULT_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
 /// The default socket address to listen on
 const DEFAULT_SOCKET_ADDRESS: SocketAddr = SocketAddr::new(DEFAULT_IP, DEFAULT_PORT);
 
-/// The data type of the number used to store the command length
-type CommandLenType = u64;
-/// The number of bytes used to represent the command length
-const COMMAND_LEN: usize = std::mem::size_of::<CommandLenType>();
-
-/// The data type of the number used to store the key length
-type KeyType = u16;
-/// The number of bytes used to represent the key length
-const KEY_LEN: usize = std::mem::size_of::<KeyType>();
+/// The data type of the number used to store the request length
+type RequestLenType = u64;
+/// The number of bytes used to represent the request length
+const REQUEST_LEN: usize = std::mem::size_of::<RequestLenType>();
 
 /// The data type of the number used to store the data type
-type CommandOpType = u8;
-/// The number of bytes used to represent the command type
-const COMMAND_OP_LEN: usize = std::mem::size_of::<CommandOpType>();
+type RequestOpType = u8;
+/// The number of bytes used to represent the requests type
+const REQUEST_OP_LEN: usize = std::mem::size_of::<RequestOpType>();
 
-/// The struct responsible for handeling commands over tcp
+/// The struct responsible for handeling connections over tcp
 pub struct TcpServer {
     listener: TcpListener,
 }
 
 impl TcpServer {
-    // Create a new command handler
+    // Create a new tcp server
     pub fn new<A: ToSocketAddrs>(addr: A) -> Self {
         Self {
             // TODO: Add error handling
@@ -59,26 +54,26 @@ impl crate::Server for TcpServer {
     }
 }
 
-// structure for a command over tcp is
-// | 8 bytes command length not including the first 8 bytes | 1 byte command type | rest command specific |
+// structure for a request over tcp is
+// | 8 bytes request length not including the first 8 bytes | 1 byte request type | rest request specific |
 
 // implementing Connection for a tcp stream
 impl crate::Connection for TcpStream {
-    fn recieve(&mut self) -> Result<crate::Command, crate::CommandError> {
+    fn recieve(&mut self) -> Result<crate::Request, crate::RecieveError> {
         // first get the size of the payload
-        let mut buffer = [0; COMMAND_LEN];
+        let mut buffer = [0; REQUEST_LEN];
         self.read_exact(&mut buffer)
-            .map_err(|_| crate::CommandError::RecieveFailed)?;
-        let command_len = CommandLenType::from_be_bytes(buffer);
+            .map_err(|_| crate::RecieveError::RecieveFailed)?;
+        let request_len = RequestLenType::from_be_bytes(buffer);
 
-        // TODO: Add check to make sure that the command length is long enough to accomodate everything
+        // TODO: Add check to make sure that the request length is long enough to accomodate everything
 
         // read the rest of the data
-        let mut buffer = vec![0; command_len as usize];
+        let mut buffer = vec![0; request_len as usize];
         self.read_exact(&mut buffer)
-            .map_err(|_| crate::CommandError::RecieveFailed)?;
+            .map_err(|_| crate::RecieveError::RecieveFailed)?;
 
-        crate::Command::try_from(buffer.as_slice())
+        crate::Request::try_from(buffer.as_slice())
     }
 
     fn send(&self) {
@@ -86,34 +81,34 @@ impl crate::Connection for TcpStream {
     }
 }
 
-impl TryFrom<&[u8]> for crate::Command {
-    type Error = CommandError;
+impl TryFrom<&[u8]> for crate::Request {
+    type Error = RecieveError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        // first determine the tyep of command sent
-        let command_type =
-            CommandOpType::from_be_bytes(unsafe { slice_to_array(&value[..COMMAND_OP_LEN]) });
-        let value = &value[COMMAND_OP_LEN..];
+        // first determine the tyep of request sent
+        let request_type =
+            RequestOpType::from_be_bytes(unsafe { slice_to_array(&value[..REQUEST_OP_LEN]) });
+        let value = &value[REQUEST_OP_LEN..];
 
-        match command_type {
+        match request_type {
             // GET
             // | 2 bytes key length (n) | n bytes key |
-            0 => Ok(crate::Command::Get(
+            0 => Ok(crate::Request::Get(
                 Key::deserialize(value)
                     .map(|(key, _)| key)
-                    .map_err(|_| CommandError::InvalidKey)?,
+                    .map_err(|_| RecieveError::InvalidKey)?,
             )),
             // SET
             // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the data payload |
             1 => {
-                let (key, value) = Key::deserialize(value).map_err(|_| CommandError::InvalidKey)?;
+                let (key, value) = Key::deserialize(value).map_err(|_| RecieveError::InvalidKey)?;
 
                 let (object, _) =
-                    Object::deserialize(value).map_err(|_| CommandError::InvalidObject)?;
+                    Object::deserialize(value).map_err(|_| RecieveError::InvalidObject)?;
 
-                Ok(crate::Command::Set(key, object))
+                Ok(crate::Request::Set(key, object))
             }
-            _ => Err(CommandError::InvalidType),
+            _ => Err(RecieveError::InvalidType),
         }
     }
 }

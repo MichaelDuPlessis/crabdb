@@ -1,7 +1,7 @@
 //! Implements the command handler trait over tcp
 
 use crate::CommandError;
-use crab_core::{Key, slice_to_array};
+use crab_core::{Deserialize, Key, Object, slice_to_array};
 use std::{
     io::Read,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
@@ -86,21 +86,6 @@ impl crate::Connection for TcpStream {
     }
 }
 
-/// Extracts the key, returning the key and a slice to data just after the key
-fn extract_key(buffer: &[u8]) -> Result<(Key, &[u8]), crate::CommandError> {
-    // first extract key length
-    if buffer.len() < KEY_LEN {
-        return Err(crate::CommandError::InvalidKey);
-    }
-    let key_len = KeyType::from_be_bytes(unsafe { slice_to_array(&buffer[..KEY_LEN]) });
-    let key_end = KEY_LEN + key_len as usize;
-    let key =
-        str::from_utf8(&buffer[KEY_LEN..key_end]).map_err(|_| crate::CommandError::InvalidKey)?;
-    let key = Key::from(key);
-
-    Ok((key, &buffer[key_end..]))
-}
-
 impl TryFrom<&[u8]> for crate::Command {
     type Error = CommandError;
 
@@ -108,19 +93,27 @@ impl TryFrom<&[u8]> for crate::Command {
         // first determine the tyep of command sent
         let command_type =
             CommandOpType::from_be_bytes(unsafe { slice_to_array(&value[..COMMAND_OP_LEN]) });
+        let value = &value[COMMAND_OP_LEN..];
 
-        Ok(match command_type {
+        match command_type {
             // GET
             // | 2 bytes key length (n) | n bytes key |
-            0 => crate::Command::Get(extract_key(&value[COMMAND_OP_LEN..]).map(|(key, _)| key)?),
+            0 => Ok(crate::Command::Get(
+                Key::deserialize(value)
+                    .map(|(key, _)| key)
+                    .map_err(|_| CommandError::InvalidKey)?,
+            )),
             // SET
             // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the data payload |
             1 => {
-                let (key, value) = extract_key(&value[COMMAND_OP_LEN..])?;
+                let (key, value) = Key::deserialize(value).map_err(|_| CommandError::InvalidKey)?;
 
-                todo!()
+                let (object, _) =
+                    Object::deserialize(value).map_err(|_| CommandError::InvalidObject)?;
+
+                Ok(crate::Command::Set(key, object))
             }
-            _ => return Err(CommandError::InvalidType),
-        })
+            _ => Err(CommandError::InvalidType),
+        }
     }
 }

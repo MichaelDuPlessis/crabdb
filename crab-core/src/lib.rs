@@ -8,7 +8,8 @@ pub enum DeserializeError {
 
 /// Implementations of this trait must implement a way to convert some type to another type
 pub trait Deserialize<T>: Sized {
-    fn deserialize(source: T) -> Result<Self, DeserializeError>;
+    /// Converts from one type to another and returns that type along with what remains from the previous type
+    fn deserialize(source: T) -> Result<(Self, T), DeserializeError>;
 }
 
 /// The data type of the number used to store the data type
@@ -129,7 +130,7 @@ impl Object {
 }
 
 impl Deserialize<&[u8]> for Object {
-    fn deserialize(source: &[u8]) -> Result<Self, DeserializeError> {
+    fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
         // first check if the size is large enough
         if source.len() < 2 {
             return Err(DeserializeError::MalformedData);
@@ -143,12 +144,15 @@ impl Deserialize<&[u8]> for Object {
             // Int object
             0 => {
                 // making sure there is exactly the correct amount of data
-                if source.len() != std::mem::size_of::<IntType>() {
+                if source.len() < std::mem::size_of::<IntType>() {
                     Err(DeserializeError::MalformedData)
                 } else {
-                    Ok(Self::new_int(IntType::from_be_bytes(unsafe {
-                        slice_to_array(source)
-                    })))
+                    Ok((
+                        Self::new_int(IntType::from_be_bytes(unsafe {
+                            slice_to_array(&source[..std::mem::size_of::<IntType>()])
+                        })),
+                        &source[..std::mem::size_of::<IntType>()],
+                    ))
                 }
             }
             // Text type
@@ -164,15 +168,15 @@ impl Deserialize<&[u8]> for Object {
                 // making sure there is enough bytes left
                 let source = &source[TEXT_LEN_TYPE_NUM_BYTES..];
 
-                if source.len() != text_len {
+                if source.len() < text_len {
                     return Err(DeserializeError::MalformedData);
                 }
 
                 // try and convert byte slice to string
-                let text = str::from_utf8(source)
+                let text = str::from_utf8(&source[..text_len])
                     .map_err(|_| DeserializeError::MalformedData)?
                     .to_owned();
-                Ok(Object::new_text(text))
+                Ok((Object::new_text(text), &source[text_len..]))
             }
             _ => return Err(DeserializeError::InvalidType),
         }
@@ -180,7 +184,7 @@ impl Deserialize<&[u8]> for Object {
 }
 
 impl Deserialize<&[u8]> for Key {
-    fn deserialize(source: &[u8]) -> Result<Self, DeserializeError> {
+    fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
         // first check if the size is large enough
         if source.len() < 2 {
             return Err(DeserializeError::MalformedData);
@@ -189,17 +193,17 @@ impl Deserialize<&[u8]> for Key {
         // extracting text length
         let key_len = KeyLenType::from_be_bytes(unsafe { slice_to_array(source) }) as usize;
         // making sure there is enough bytes left
-        let source = &source[TEXT_LEN_TYPE_NUM_BYTES..];
+        let source = &source[KEY_LEN_TYPE_NUM_BYTES..];
 
-        if source.len() != key_len {
+        if source.len() < key_len {
             return Err(DeserializeError::MalformedData);
         }
 
         // try and convert byte slice to string
-        let key = str::from_utf8(source)
+        let key = str::from_utf8(&source[..key_len])
             .map_err(|_| DeserializeError::MalformedData)?
             .to_owned();
 
-        Ok(Key::new(key))
+        Ok((Key::new(key), &source[key_len..]))
     }
 }

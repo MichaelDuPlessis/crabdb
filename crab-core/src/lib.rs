@@ -24,6 +24,11 @@ where
     unsafe { slice.try_into().unwrap_unchecked() }
 }
 
+/// The number type that is used to determine the length of the text data type
+type KeyLenType = u16;
+/// The number of bytes used to store the length of the text data type
+const KEY_LEN_TYPE_NUM_BYTES: usize = std::mem::size_of::<KeyLenType>();
+
 /// What items are stored under in the database
 // TODO: I don't care about the capacity of the string so maybe change to a len and u8 slice instead
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -171,5 +176,30 @@ impl Deserialize<&[u8]> for Object {
             }
             _ => return Err(DeserializeError::InvalidType),
         }
+    }
+}
+
+impl Deserialize<&[u8]> for Key {
+    fn deserialize(source: &[u8]) -> Result<Self, DeserializeError> {
+        // first check if the size is large enough
+        if source.len() < 2 {
+            return Err(DeserializeError::MalformedData);
+        }
+
+        // extracting text length
+        let key_len = KeyLenType::from_be_bytes(unsafe { slice_to_array(source) }) as usize;
+        // making sure there is enough bytes left
+        let source = &source[TEXT_LEN_TYPE_NUM_BYTES..];
+
+        if source.len() != key_len {
+            return Err(DeserializeError::MalformedData);
+        }
+
+        // try and convert byte slice to string
+        let key = str::from_utf8(source)
+            .map_err(|_| DeserializeError::MalformedData)?
+            .to_owned();
+
+        Ok(Key::new(key))
     }
 }

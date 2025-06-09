@@ -34,6 +34,21 @@ pub enum Request {
     Terminated,
 }
 
+/// The kinds of errors that can occuer when sending a request
+#[derive(Debug)]
+pub enum ResponseError {}
+
+/// A response sent by the server
+#[derive(Debug)]
+pub enum Response {
+    /// The request was successful and there is a payload
+    Payload(Object),
+    /// The request was a success and there is no payload
+    NoData,
+    /// There was an error with the request
+    Error,
+}
+
 /// All methods that a Server must implement to be usable
 pub trait Server {
     type Handler: Connection;
@@ -46,8 +61,8 @@ pub trait Server {
 /// Represents some connection to the server
 pub trait Connection {
     /// Retrieve request from a connection from a client. This blocks until a request is received or the connection is closed
-    fn recieve(&mut self) -> Result<Request, RecieveError>;
+    fn receive(&mut self) -> Result<Request, RecieveError>;
 
     /// Send data to connection
-    fn send(&self);
+    fn send(&self, response: Response) -> Result<(), ResponseError>;
 }

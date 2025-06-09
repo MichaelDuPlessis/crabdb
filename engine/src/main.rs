@@ -39,7 +39,7 @@ fn main() {
         // when a connection is recieved send it to the threadpool
         threadpool.execute(move || {
             loop {
-                let command = match connection.recieve() {
+                let command = match connection.receive() {
                     Ok(command) => command,
                     Err(err) => {
                         println!("An error occured: {:?}", err);

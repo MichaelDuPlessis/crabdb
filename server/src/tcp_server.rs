@@ -59,7 +59,7 @@ impl crate::Server for TcpServer {
 
 // implementing Connection for a tcp stream
 impl crate::Connection for TcpStream {
-    fn recieve(&mut self) -> Result<crate::Request, crate::RecieveError> {
+    fn receive(&mut self) -> Result<crate::Request, crate::RecieveError> {
         // first get the size of the payload
         let mut buffer = [0; REQUEST_LEN];
         self.read_exact(&mut buffer)
@@ -76,7 +76,7 @@ impl crate::Connection for TcpStream {
         crate::Request::try_from(buffer.as_slice())
     }
 
-    fn send(&self) {
+    fn send(&self, response: crate::Response) -> Result<(), crate::ResponseError> {
         todo!()
     }
 }

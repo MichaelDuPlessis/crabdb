@@ -23,17 +23,17 @@ impl Default for InMemoryStore {
 }
 
 impl Storage for InMemoryStore {
-    fn set(&mut self, key: Key, object: Object) -> crate::Result<Option<Object>> {
-        Ok(self.map.insert(key, object))
+    fn set(&mut self, key: Key, object: Object) -> crate::Result<Object> {
+        Ok(self.map.insert(key, object).unwrap_or(Object::Null))
     }
 
-    fn get(&self, key: impl Borrow<Key>) -> crate::Result<Option<Object>> {
+    fn get(&self, key: impl Borrow<Key>) -> crate::Result<Object> {
         let key = key.borrow();
-        Ok(self.map.get(key).cloned())
+        Ok(self.map.get(key).cloned().unwrap_or(Object::Null))
     }
 
-    fn delete(&mut self, key: impl Borrow<Key>) -> crate::Result<Option<Object>> {
+    fn delete(&mut self, key: impl Borrow<Key>) -> crate::Result<Object> {
         let key = key.borrow();
-        Ok(self.map.remove(key))
+        Ok(self.map.remove(key).unwrap_or(Object::Null))
     }
 }

@@ -174,18 +174,25 @@ impl Deserialize<&[u8]> for Text {
 /// The available data types for the database
 #[derive(Debug, Clone)]
 pub enum Object {
+    /// Nothing
+    Null,
+    /// A number
     Int(Int),
+    /// A string
     Text(Text),
     // Struct,
     // List,
 }
 
 impl Object {
-    /// The value associated with an Int
-    pub const INT_TAG: u8 = 0;
+    /// The value associates with nothing
+    pub const NULL_TAG: u8 = 0;
 
     /// The value associated with an Int
-    pub const TEXT_TAG: u8 = 1;
+    pub const INT_TAG: u8 = 1;
+
+    /// The value associated with an Int
+    pub const TEXT_TAG: u8 = 2;
 
     /// Creates a new Int type
     pub fn new_int<T>(num: T) -> Self
@@ -207,6 +214,7 @@ impl Object {
 impl Serialize<Vec<u8>> for Object {
     fn serialize(self) -> Result<Vec<u8>, SerializeError> {
         match self {
+            Object::Null => Ok(vec![Object::NULL_TAG]),
             Object::Int(int) => int.serialize(),
             Object::Text(text) => text.serialize(),
         }

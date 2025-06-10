@@ -1,9 +1,9 @@
 //! Implements the Server trait over tcp
 
 use crate::RecieveError;
-use crab_core::{Deserialize, Key, Object, slice_to_array};
+use crab_core::{Deserialize, Key, Object, Serialize, slice_to_array};
 use std::{
-    io::Read,
+    io::{Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
 };
 
@@ -76,8 +76,13 @@ impl crate::Connection for TcpStream {
         crate::Request::try_from(buffer.as_slice())
     }
 
-    fn send(&self, response: crate::Response) -> Result<(), crate::ResponseError> {
-        todo!()
+    fn send(&mut self, response: crate::Response) -> Result<(), crate::ResponseError> {
+        let response = response
+            .serialize()
+            .map_err(|_| crate::ResponseError::ResponseFailed)?;
+
+        self.write_all(&response)
+            .map_err(|_| crate::ResponseError::ResponseFailed)
     }
 }
 
@@ -109,6 +114,15 @@ impl TryFrom<&[u8]> for crate::Request {
                 Ok(crate::Request::Set(key, object))
             }
             _ => Err(RecieveError::InvalidType),
+        }
+    }
+}
+
+impl Serialize<Vec<u8>> for crate::Response {
+    fn serialize(self) -> Result<Vec<u8>, crab_core::SerializeError> {
+        match self {
+            crate::Response::Payload(object) => object.serialize(),
+            crate::Response::Error => Ok(vec![255]),
         }
     }
 }

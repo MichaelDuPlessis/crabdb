@@ -46,8 +46,6 @@ pub enum ResponseError {
 pub enum Response {
     /// The request was successful and there is a payload
     Payload(Object),
-    /// The request was a success and there is no payload
-    NoData,
     /// There was an error with the request
     Error,
 }
@@ -67,5 +65,5 @@ pub trait Connection {
     fn receive(&mut self) -> Result<Request, RecieveError>;
 
     /// Send data to connection
-    fn send(&self, response: Response) -> Result<(), ResponseError>;
+    fn send(&mut self, response: Response) -> Result<(), ResponseError>;
 }

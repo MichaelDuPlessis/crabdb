@@ -1,4 +1,4 @@
-use server::{Connection, Server, tcp_server::TcpServer};
+use server::{Connection, Response, Server, tcp_server::TcpServer};
 use storage::Storage;
 use threadpool::ThreadPool;
 
@@ -31,6 +31,13 @@ impl<S: Server, D: Storage> Engine<S, D> {
                     server::Request::Set(key, object) => self.storage.set(key, object),
                     server::Request::Terminated => break,
                 };
+
+                let response = match response {
+                    Ok(object) => Response::Payload(object),
+                    Err(_) => Response::Error,
+                };
+
+                connection.send(response).unwrap()
             }
         }
     }

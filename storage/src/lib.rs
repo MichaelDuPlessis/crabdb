@@ -4,6 +4,7 @@ use std::borrow::Borrow;
 mod in_memory_store;
 
 /// The types of errors that can occur with a storage medium
+#[derive(Debug)]
 pub enum StorageError {}
 
 type Result<T> = std::result::Result<T, StorageError>;

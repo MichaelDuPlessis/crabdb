@@ -86,7 +86,7 @@ impl From<isize> for Int {
 
 impl Serialize<Vec<u8>> for Int {
     fn serialize(self) -> Result<Vec<u8>, SerializeError> {
-        let mut int = [0; 1 + std::mem::size_of::<IntType>()];
+        let mut int = [0; OBJECT_TYPE_NUM_BYTES + std::mem::size_of::<IntType>()];
         int[..OBJECT_TYPE_NUM_BYTES].copy_from_slice(&Object::INT_TAG.to_be_bytes());
         int[OBJECT_TYPE_NUM_BYTES..].copy_from_slice(&self.0.to_be_bytes());
 
@@ -123,7 +123,11 @@ impl From<String> for Text {
 
 impl Serialize<Vec<u8>> for Text {
     fn serialize(self) -> Result<Vec<u8>, SerializeError> {
-        Ok(self.0.into())
+        let mut text = Vec::with_capacity(OBJECT_TYPE_NUM_BYTES + self.0.len());
+        text[..OBJECT_TYPE_NUM_BYTES].copy_from_slice(&Object::TEXT_TAG.to_be_bytes());
+        text[OBJECT_TYPE_NUM_BYTES..].copy_from_slice(&self.0.as_bytes());
+
+        Ok(text)
     }
 }
 

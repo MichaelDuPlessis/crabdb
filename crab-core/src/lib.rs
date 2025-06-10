@@ -63,7 +63,7 @@ where
 /// The number type to use of the Int data object
 type IntType = isize;
 /// The Int data type. It is internally reprsented as an isize.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Int(IntType);
 
 impl Int {
@@ -116,7 +116,7 @@ type TextLenType = u16;
 const TEXT_LEN_TYPE_NUM_BYTES: usize = std::mem::size_of::<TextLenType>();
 
 /// The Text data type. It is internally reprsented as an String.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Text(String);
 
 impl Text {
@@ -172,7 +172,7 @@ impl Deserialize<&[u8]> for Text {
 }
 
 /// The available data types for the database
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Object {
     Int(Int),
     Text(Text),

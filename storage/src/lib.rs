@@ -1,4 +1,5 @@
 use crab_core::{Key, Object};
+use std::borrow::Borrow;
 
 mod in_memory_store;
 
@@ -13,8 +14,8 @@ pub trait Storage {
     fn set(&mut self, key: Key, object: Object) -> Result<Option<Object>>;
 
     /// Gets an object saved in the database under a key or none if the key is not found
-    fn get(&self, key: impl AsRef<Key>) -> Result<Option<&Object>>;
+    fn get(&self, key: impl Borrow<Key>) -> Result<Option<Object>>;
 
     /// Deletes an object from the database under a key and returns the object or none if the key is not found
-    fn delete(&mut self, key: impl AsRef<Key>) -> Result<Option<Object>>;
+    fn delete(&mut self, key: impl Borrow<Key>) -> Result<Option<Object>>;
 }

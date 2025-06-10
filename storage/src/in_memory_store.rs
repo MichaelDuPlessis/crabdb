@@ -1,6 +1,6 @@
 use crate::Storage;
 use crab_core::{Key, Object};
-use std::collections::HashMap;
+use std::{borrow::Borrow, collections::HashMap};
 
 /// A storage medium that exists only in memory and does not persist data
 pub struct InMemoryStore {
@@ -27,13 +27,13 @@ impl Storage for InMemoryStore {
         Ok(self.map.insert(key, object))
     }
 
-    fn get(&self, key: impl AsRef<Key>) -> crate::Result<Option<&Object>> {
-        let key = key.as_ref();
-        Ok(self.map.get(key))
+    fn get(&self, key: impl Borrow<Key>) -> crate::Result<Option<Object>> {
+        let key = key.borrow();
+        Ok(self.map.get(key).cloned())
     }
 
-    fn delete(&mut self, key: impl AsRef<Key>) -> crate::Result<Option<Object>> {
-        let key = key.as_ref();
+    fn delete(&mut self, key: impl Borrow<Key>) -> crate::Result<Option<Object>> {
+        let key = key.borrow();
         Ok(self.map.remove(key))
     }
 }

@@ -20,7 +20,18 @@ impl<S: Server, D: Storage> Engine<S, D> {
             // waiting for a connection
             let mut connection = self.server.listen();
 
-            // recieving data
+            // Now that a connection has been made continously recieve data
+            loop {
+                // recieving data
+                let request = connection.receive().unwrap();
+
+                // seeing what kind of request is made
+                let response = match request {
+                    server::Request::Get(key) => self.storage.get(key),
+                    server::Request::Set(key, object) => self.storage.set(key, object),
+                    server::Request::Terminated => break,
+                };
+            }
         }
     }
 }

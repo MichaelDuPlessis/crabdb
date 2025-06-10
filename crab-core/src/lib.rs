@@ -94,6 +94,22 @@ impl Serialize<Vec<u8>> for Int {
     }
 }
 
+impl Deserialize<&[u8]> for Int {
+    fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
+        // making sure there is exactly the correct amount of data
+        if source.len() < std::mem::size_of::<IntType>() {
+            Err(DeserializeError::MalformedData)
+        } else {
+            Ok((
+                Self::new(IntType::from_be_bytes(unsafe {
+                    slice_to_array(&source[..std::mem::size_of::<IntType>()])
+                })),
+                &source[..std::mem::size_of::<IntType>()],
+            ))
+        }
+    }
+}
+
 /// The number type that is used to determine the length of the text data type
 type TextLenType = u16;
 /// The number of bytes used to store the length of the text data type
@@ -128,6 +144,30 @@ impl Serialize<Vec<u8>> for Text {
         text[OBJECT_TYPE_NUM_BYTES..].copy_from_slice(&self.0.as_bytes());
 
         Ok(text)
+    }
+}
+
+impl Deserialize<&[u8]> for Text {
+    fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
+        // making sure there is enough data
+        if source.len() < TEXT_LEN_TYPE_NUM_BYTES {
+            return Err(DeserializeError::MalformedData);
+        }
+
+        // extracting text length
+        let text_len = TextLenType::from_be_bytes(unsafe { slice_to_array(source) }) as usize;
+        // making sure there is enough bytes left
+        let source = &source[TEXT_LEN_TYPE_NUM_BYTES..];
+
+        if source.len() < text_len {
+            return Err(DeserializeError::MalformedData);
+        }
+
+        // try and convert byte slice to string
+        let text = str::from_utf8(&source[..text_len])
+            .map_err(|_| DeserializeError::MalformedData)?
+            .to_owned();
+        Ok((Text::new(text), &source[text_len..]))
     }
 }
 
@@ -186,41 +226,10 @@ impl Deserialize<&[u8]> for Object {
 
         match object_type {
             // Int object
-            Self::INT_TAG => {
-                // making sure there is exactly the correct amount of data
-                if source.len() < std::mem::size_of::<IntType>() {
-                    Err(DeserializeError::MalformedData)
-                } else {
-                    Ok((
-                        Self::new_int(IntType::from_be_bytes(unsafe {
-                            slice_to_array(&source[..std::mem::size_of::<IntType>()])
-                        })),
-                        &source[..std::mem::size_of::<IntType>()],
-                    ))
-                }
-            }
+            Self::INT_TAG => Int::deserialize(source).map(|(int, rest)| (Self::new_int(int), rest)),
             // Text type
             Self::TEXT_TAG => {
-                // making sure there is enough data
-                if source.len() < TEXT_LEN_TYPE_NUM_BYTES {
-                    return Err(DeserializeError::MalformedData);
-                }
-
-                // extracting text length
-                let text_len =
-                    TextLenType::from_be_bytes(unsafe { slice_to_array(source) }) as usize;
-                // making sure there is enough bytes left
-                let source = &source[TEXT_LEN_TYPE_NUM_BYTES..];
-
-                if source.len() < text_len {
-                    return Err(DeserializeError::MalformedData);
-                }
-
-                // try and convert byte slice to string
-                let text = str::from_utf8(&source[..text_len])
-                    .map_err(|_| DeserializeError::MalformedData)?
-                    .to_owned();
-                Ok((Object::new_text(text), &source[text_len..]))
+                Text::deserialize(source).map(|(text, rest)| (Self::new_text(text), rest))
             }
             _ => return Err(DeserializeError::InvalidType),
         }

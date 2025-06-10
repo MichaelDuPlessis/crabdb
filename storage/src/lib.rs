@@ -1,7 +1,7 @@
 use crab_core::{Key, Object};
 use std::borrow::Borrow;
 
-mod in_memory_store;
+pub mod in_memory_store;
 
 /// The types of errors that can occur with a storage medium
 #[derive(Debug)]

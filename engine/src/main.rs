@@ -1,5 +1,5 @@
 use server::{Connection, Response, Server, tcp_server::TcpServer};
-use storage::Storage;
+use storage::{Storage, in_memory_store::InMemoryStore};
 use threadpool::ThreadPool;
 
 /// The engine of the database. It controls all the logic
@@ -44,29 +44,9 @@ impl<S: Server, D: Storage> Engine<S, D> {
 }
 
 fn main() {
-    // instantiating the threadpool
-    let mut threadpool = ThreadPool::default();
+    let server = TcpServer::default();
+    let storage = InMemoryStore::default();
+    let mut engine = Engine::new(server, storage);
 
-    // first create a command handler
-    let command_handler = TcpServer::default();
-
-    // loop forever for incomming connections
-    loop {
-        let mut connection = command_handler.listen();
-
-        // when a connection is recieved send it to the threadpool
-        threadpool.execute(move || {
-            loop {
-                let command = match connection.receive() {
-                    Ok(command) => command,
-                    Err(err) => {
-                        println!("An error occured: {:?}", err);
-                        break;
-                    }
-                };
-
-                println!("Command recieved: {:?}", command);
-            }
-        });
-    }
+    engine.start().unwrap();
 }

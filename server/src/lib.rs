@@ -36,7 +36,10 @@ pub enum Request {
 
 /// The kinds of errors that can occuer when sending a request
 #[derive(Debug)]
-pub enum ResponseError {}
+pub enum ResponseError {
+    /// The response failed to send
+    ResponseFailed,
+}
 
 /// A response sent by the server
 #[derive(Debug)]

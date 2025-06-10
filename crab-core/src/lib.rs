@@ -12,6 +12,15 @@ pub trait Deserialize<T>: Sized {
     fn deserialize(source: T) -> Result<(Self, T), DeserializeError>;
 }
 
+/// Errors that can occur when seriarlizing
+pub enum SerializeError {}
+
+/// Implementations of this tait must implement a way to serialize the type
+pub trait Serialize<T> {
+    /// Converts from a concrete type to another type that can be stored or sent
+    fn serialize(self) -> Result<T, SerializeError>;
+}
+
 /// The data type of the number used to store the data type
 type ObjectType = u8;
 /// The number of bytes used to represent the data type
@@ -75,6 +84,16 @@ impl From<isize> for Int {
     }
 }
 
+impl Serialize<Vec<u8>> for Int {
+    fn serialize(self) -> Result<Vec<u8>, SerializeError> {
+        let mut int = [0; 1 + std::mem::size_of::<IntType>()];
+        int[..OBJECT_TYPE_NUM_BYTES].copy_from_slice(&Object::INT_TAG.to_be_bytes());
+        int[OBJECT_TYPE_NUM_BYTES..].copy_from_slice(&self.0.to_be_bytes());
+
+        Ok(int.into())
+    }
+}
+
 /// The number type that is used to determine the length of the text data type
 type TextLenType = u16;
 /// The number of bytes used to store the length of the text data type
@@ -102,6 +121,12 @@ impl From<String> for Text {
     }
 }
 
+impl Serialize<Vec<u8>> for Text {
+    fn serialize(self) -> Result<Vec<u8>, SerializeError> {
+        Ok(self.0.into())
+    }
+}
+
 /// The available data types for the database
 #[derive(Debug)]
 pub enum Object {
@@ -112,6 +137,12 @@ pub enum Object {
 }
 
 impl Object {
+    /// The value associated with an Int
+    pub const INT_TAG: u8 = 0;
+
+    /// The value associated with an Int
+    pub const TEXT_TAG: u8 = 1;
+
     /// Creates a new Int type
     pub fn new_int<T>(num: T) -> Self
     where
@@ -129,6 +160,15 @@ impl Object {
     }
 }
 
+impl Serialize<Vec<u8>> for Object {
+    fn serialize(self) -> Result<Vec<u8>, SerializeError> {
+        match self {
+            Object::Int(int) => int.serialize(),
+            Object::Text(text) => text.serialize(),
+        }
+    }
+}
+
 impl Deserialize<&[u8]> for Object {
     fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
         // first check if the size is large enough
@@ -142,7 +182,7 @@ impl Deserialize<&[u8]> for Object {
 
         match object_type {
             // Int object
-            0 => {
+            Self::INT_TAG => {
                 // making sure there is exactly the correct amount of data
                 if source.len() < std::mem::size_of::<IntType>() {
                     Err(DeserializeError::MalformedData)
@@ -156,7 +196,7 @@ impl Deserialize<&[u8]> for Object {
                 }
             }
             // Text type
-            1 => {
+            Self::TEXT_TAG => {
                 // making sure there is enough data
                 if source.len() < TEXT_LEN_TYPE_NUM_BYTES {
                     return Err(DeserializeError::MalformedData);

@@ -3,6 +3,7 @@
 # This code was written by an LLM. I couldn't be bothered to write simple test
 # program from scratchimport socket
 
+import socket
 import struct
 import argparse
 import sys

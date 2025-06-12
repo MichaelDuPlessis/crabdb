@@ -33,12 +33,12 @@ The `SET` command is used to store a key-value pair.
 
 **Payload Structure:**
 
-| Part          | Size (bytes) | Description                                                |
-| ------------- | ------------ | ---------------------------------------------------------- |
-| Key Length    | 2            | The length of the key string (`n`).                        |
-| Key           | `n`          | The key, encoded in UTF-8.                                 |
+| Part          | Size (bytes) | Description                                                  |
+| ------------- | ------------ | ------------------------------------------------------------ |
+| Key Length    | 2            | The length of the key string (`n`).                          |
+| Key           | `n`          | The key, encoded in UTF-8.                                   |
 | Data Type     | 1            | The type of data being stored (`0`=Null, `1`=Int, `2`=Text). |
-| Data Payload  | variable     | The actual data, structured according to its `Data Type`.  |
+| Data Payload  | variable     | The actual data, structured according to its `Data Type`.    |
 
 
 #### `GET` Command (Request Type: `0`)
@@ -70,8 +70,8 @@ A null value has no data payload.
 
 An integer is stored as a signed 8-byte integer.
 
-| Part   | Size (bytes) | Description             |
-| ------ | ------------ | ----------------------- |
+| Part   | Size (bytes) | Description            |
+| ------ | ------------ | ---------------------- |
 | Number | 8            | A signed 64-bit integer.|
 
 
@@ -79,7 +79,30 @@ An integer is stored as a signed 8-byte integer.
 
 A text value is prefixed with its length.
 
-| Part        | Size (bytes) | Description                   |
-| ----------- | ------------ | ----------------------------- |
-| Text Length | 2            | The length of the text (`m`). |
-| Text Data   | `m`          | The text, encoded in UTF-8.   |
+| Part        | Size (bytes) | Description                      |
+| ----------- | ------------ | -------------------------------- |
+| Text Length | 2            | The length of the text (`m`).    |
+| Text Data   | `m`          | The text, encoded in UTF-8.      |
+
+### General Response Structures
+
+The server will respond with one of two main structures, depending on whether the operation was successful or resulted in an error. All integer values in the protocol are sent in **big-endian** format.
+
+#### 1. Response for Successful Operations
+
+This structure is used when a command successfully processes and returns a value (or a null acknowledgment for `SET` operations).
+
+| Part            | Size (bytes) | Description                                                                                                                                                                                                                         |
+| :-------------- | :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Response Length | 8            | The total length of the following data (in bytes). This will be `1` (for the `Data Type` byte) plus the length of the `Data Payload`.                                                                                              |
+| Data Type       | 1            | The type of data being returned: `0`=Null, `1`=Int, `2`=Text.                                                                                                                                                                         |
+| Data Payload    | variable     | The actual data, structured according to its `Data Type` (as defined in the "Data Types" section). For `Null` (`Data Type` `0`), there is no payload, so `Response Length` would be `1`. |
+
+#### 2. Response for Errors
+
+This structure is used when a command encounters an error. It's a fixed, simple error indicator.
+
+| Part            | Size (bytes) | Description                                         |
+| :-------------- | :----------- | :-------------------------------------------------- |
+| Response Length | 8            | The total length of the following data (in bytes). **This will always be `1` for an error response.** |
+| Error Indicator | 1            | A single byte with the value `255`, signifying an error. |

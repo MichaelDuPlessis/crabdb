@@ -233,6 +233,7 @@ impl Deserialize<&[u8]> for Object {
         let source = &source[OBJECT_TYPE_NUM_BYTES..];
 
         match object_type {
+            Self::NULL_TAG => Ok((Self::Null, source)),
             // Int object
             Self::INT_TAG => Int::deserialize(source).map(|(int, rest)| (Self::new_int(int), rest)),
             // Text type

@@ -15,9 +15,9 @@ const DEFAULT_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
 const DEFAULT_SOCKET_ADDRESS: SocketAddr = SocketAddr::new(DEFAULT_IP, DEFAULT_PORT);
 
 /// The data type of the number used to store the request length
-type RequestLenType = u64;
+type DataLenType = u64;
 /// The number of bytes used to represent the request length
-const REQUEST_LEN: usize = std::mem::size_of::<RequestLenType>();
+const DATA_LEN_NUM_BYTES: usize = std::mem::size_of::<DataLenType>();
 
 /// The data type of the number used to store the data type
 type RequestOpType = u8;
@@ -54,17 +54,14 @@ impl crate::Server for TcpServer {
     }
 }
 
-// structure for a request over tcp is
-// | 8 bytes request length not including the first 8 bytes | 1 byte request type | rest request specific |
-
 // implementing Connection for a tcp stream
 impl crate::Connection for TcpStream {
     fn receive(&mut self) -> Result<crate::Request, crate::RecieveError> {
         // first get the size of the payload
-        let mut buffer = [0; REQUEST_LEN];
+        let mut buffer = [0; DATA_LEN_NUM_BYTES];
         self.read_exact(&mut buffer)
             .map_err(|_| crate::RecieveError::RecieveFailed)?;
-        let request_len = RequestLenType::from_be_bytes(buffer);
+        let request_len = DataLenType::from_be_bytes(buffer);
 
         // TODO: Add check to make sure that the request length is long enough to accomodate everything
 
@@ -86,6 +83,8 @@ impl crate::Connection for TcpStream {
     }
 }
 
+// structure for a request over tcp is
+// | 8 bytes request length not including the first 8 bytes | 1 byte request type | rest request specific |
 impl TryFrom<&[u8]> for crate::Request {
     type Error = RecieveError;
 
@@ -118,11 +117,26 @@ impl TryFrom<&[u8]> for crate::Request {
     }
 }
 
+// structure for a response over tcp is
+// | 8 bytes request length not including the first 8 bytes | 1 byte data type | rest is the data returend |
 impl Serialize<Vec<u8>> for crate::Response {
     fn serialize(self) -> Result<Vec<u8>, crab_core::SerializeError> {
         match self {
-            crate::Response::Payload(object) => object.serialize(),
-            crate::Response::Error => Ok(vec![255]),
+            crate::Response::Payload(object) => Ok({
+                let object = object.serialize()?;
+                let mut res = object.len().to_be_bytes().to_vec();
+                res.extend(object);
+                res
+            }),
+            // Returning error
+            crate::Response::Error => Ok({
+                let data_len = (1 as DataLenType).to_be_bytes();
+                let mut res = [0; 9];
+
+                res[..DATA_LEN_NUM_BYTES].copy_from_slice(&data_len);
+                res[DATA_LEN_NUM_BYTES] = 255;
+                res.to_vec()
+            }),
         }
     }
 }

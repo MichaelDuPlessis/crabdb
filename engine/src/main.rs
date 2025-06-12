@@ -1,6 +1,5 @@
 use server::{Connection, Response, Server, tcp_server::TcpServer};
 use storage::{Storage, in_memory_store::InMemoryStore};
-use threadpool::ThreadPool;
 
 /// The engine of the database. It controls all the logic
 struct Engine<S: Server, D: Storage> {

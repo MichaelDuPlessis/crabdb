@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock};
 
 pub mod int;
 pub mod text;
@@ -92,17 +92,12 @@ where
 }
 
 /// Responsible for holding and managing mappings of type ids to methods to create the types
-pub struct TypeRegistry<F>
-where
-    F: Fn(&[u8]) -> Box<dyn Object>,
-{
-    registry: HashMap<ObjectType, ObjectFactory<F>>,
+pub struct TypeRegistry {
+    registry:
+        HashMap<ObjectType, ObjectFactory<Box<dyn Fn(&[u8]) -> Box<dyn Object> + Sync + Send>>>,
 }
 
-impl<F> TypeRegistry<F>
-where
-    F: Fn(&[u8]) -> Box<dyn Object>,
-{
+impl TypeRegistry {
     /// Creates a new type registry
     pub fn new() -> Self {
         Self {
@@ -111,21 +106,28 @@ where
     }
 
     /// Inserts a factory into the registry with an associated type id
-    pub fn add_factory(&mut self, type_id: ObjectType, factory: ObjectFactory<F>) {
+    pub fn add_factory(
+        &mut self,
+        type_id: ObjectType,
+        factory: ObjectFactory<Box<dyn Fn(&[u8]) -> Box<dyn Object> + Sync + Send>>,
+    ) {
         self.registry.insert(type_id, factory);
     }
 
     /// Gets a ObjectFactory from the registry
-    pub fn get_factory(&self, type_id: ObjectType) -> Option<&ObjectFactory<F>> {
+    pub fn get_factory(
+        &self,
+        type_id: ObjectType,
+    ) -> Option<&ObjectFactory<Box<dyn Fn(&[u8]) -> Box<dyn Object> + Sync + Send>>> {
         self.registry.get(&type_id)
     }
 }
 
-impl<F> Default for TypeRegistry<F>
-where
-    F: Fn(&[u8]) -> Box<dyn Object>,
-{
+impl Default for TypeRegistry {
     fn default() -> Self {
         Self::new()
     }
 }
+
+/// There is only one type registry that must be shared with everything
+pub static REGISTRY: LazyLock<TypeRegistry> = LazyLock::new(|| TypeRegistry::default());

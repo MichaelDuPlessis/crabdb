@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::LazyLock};
+use std::{
+    collections::HashMap,
+    sync::{LazyLock, RwLock},
+};
 
 pub mod int;
 pub mod text;
@@ -69,6 +72,7 @@ where
 pub trait Object: std::fmt::Debug {}
 
 /// Responsible for creating an object
+#[derive(Debug)]
 pub struct ObjectFactory<F>
 where
     F: Fn(&[u8]) -> Box<dyn Object>,
@@ -91,10 +95,12 @@ where
     }
 }
 
+/// Just shortand for the ObjectFactory that the TypeRegistry uses
+type TypeRegistryFactoryType = ObjectFactory<Box<dyn Fn(&[u8]) -> Box<dyn Object> + Sync + Send>>;
+
 /// Responsible for holding and managing mappings of type ids to methods to create the types
 pub struct TypeRegistry {
-    registry:
-        HashMap<ObjectType, ObjectFactory<Box<dyn Fn(&[u8]) -> Box<dyn Object> + Sync + Send>>>,
+    registry: HashMap<ObjectType, TypeRegistryFactoryType>,
 }
 
 impl TypeRegistry {
@@ -106,19 +112,12 @@ impl TypeRegistry {
     }
 
     /// Inserts a factory into the registry with an associated type id
-    pub fn add_factory(
-        &mut self,
-        type_id: ObjectType,
-        factory: ObjectFactory<Box<dyn Fn(&[u8]) -> Box<dyn Object> + Sync + Send>>,
-    ) {
+    pub fn add_factory(&mut self, type_id: ObjectType, factory: TypeRegistryFactoryType) {
         self.registry.insert(type_id, factory);
     }
 
     /// Gets a ObjectFactory from the registry
-    pub fn get_factory(
-        &self,
-        type_id: ObjectType,
-    ) -> Option<&ObjectFactory<Box<dyn Fn(&[u8]) -> Box<dyn Object> + Sync + Send>>> {
+    pub fn get_factory(&self, type_id: ObjectType) -> Option<&TypeRegistryFactoryType> {
         self.registry.get(&type_id)
     }
 }
@@ -130,4 +129,16 @@ impl Default for TypeRegistry {
 }
 
 /// There is only one type registry that must be shared with everything
-pub static REGISTRY: LazyLock<TypeRegistry> = LazyLock::new(|| TypeRegistry::default());
+static REGISTRY: LazyLock<RwLock<TypeRegistry>> =
+    LazyLock::new(|| RwLock::new(TypeRegistry::default()));
+
+/// Adds a new ObjectFactory to the type registry
+pub fn new_factory(type_id: ObjectType, factory: TypeRegistryFactoryType) {
+    REGISTRY.write().unwrap().add_factory(type_id, factory);
+}
+
+/// Create a new object using the appropriate ObjectFactory in the TypeRegistry
+/// If there is not ObjectFactory for the type id None is returned
+pub fn new_object(type_id: ObjectType, data: &[u8]) -> Option<Box<dyn Object>> {
+    Some(REGISTRY.read().unwrap().get_factory(type_id)?.create(data))
+}

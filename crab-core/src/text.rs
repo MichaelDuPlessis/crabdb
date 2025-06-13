@@ -1,9 +1,6 @@
 use logging::trace;
 
-use crate::{
-    Deserialize, DeserializeError, OBJECT_TYPE_NUM_BYTES, Object, Serialize, SerializeError,
-    slice_to_array,
-};
+use crate::{Deserialize, DeserializeError, Serialize, SerializeError, slice_to_array};
 
 /// The number type that is used to determine the length of the text data type
 type TextLenType = u16;
@@ -19,11 +16,6 @@ impl Text {
     pub fn new(text: impl Into<String>) -> Self {
         Self(text.into())
     }
-
-    /// Creates a Text object
-    pub fn new_object(text: impl Into<String>) -> Object {
-        Object::Text(Self::new(text))
-    }
 }
 
 impl From<String> for Text {
@@ -34,9 +26,7 @@ impl From<String> for Text {
 
 impl Serialize<Vec<u8>> for Text {
     fn serialize(self) -> Result<Vec<u8>, SerializeError> {
-        let mut text =
-            Vec::with_capacity(OBJECT_TYPE_NUM_BYTES + self.0.len() + TEXT_LEN_TYPE_NUM_BYTES);
-        text.extend_from_slice(&Object::TEXT_TAG.to_be_bytes());
+        let mut text = Vec::with_capacity(self.0.len() + TEXT_LEN_TYPE_NUM_BYTES);
         text.extend_from_slice(&(self.0.len() as TextLenType).to_be_bytes());
         text.extend_from_slice(&self.0.as_bytes());
 

@@ -1,7 +1,4 @@
-use crate::{
-    Deserialize, DeserializeError, OBJECT_TYPE_NUM_BYTES, Object, Serialize, SerializeError,
-    slice_to_array,
-};
+use crate::{Deserialize, DeserializeError, Object, Serialize, SerializeError, slice_to_array};
 use logging::debug;
 
 /// The number type to use of the Int data object
@@ -15,11 +12,6 @@ impl Int {
     pub fn new(num: impl Into<IntType>) -> Self {
         Self(num.into())
     }
-
-    /// Creates a Int object
-    pub fn new_object(num: impl Into<IntType>) -> Object {
-        Object::Int(Self::new(num))
-    }
 }
 
 impl From<isize> for Int {
@@ -28,13 +20,11 @@ impl From<isize> for Int {
     }
 }
 
+impl Object for Int {}
+
 impl Serialize<Vec<u8>> for Int {
     fn serialize(self) -> Result<Vec<u8>, SerializeError> {
-        let mut int = [0; OBJECT_TYPE_NUM_BYTES + std::mem::size_of::<IntType>()];
-        int[..OBJECT_TYPE_NUM_BYTES].copy_from_slice(&Object::INT_TAG.to_be_bytes());
-        int[OBJECT_TYPE_NUM_BYTES..].copy_from_slice(&self.0.to_be_bytes());
-
-        Ok(int.into())
+        Ok(self.0.to_be_bytes().into())
     }
 }
 

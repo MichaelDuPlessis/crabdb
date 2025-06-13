@@ -1,4 +1,4 @@
-use crate::{Deserialize, DeserializeError, Object, Serialize, SerializeError, slice_to_array};
+use crate::{Object, ObjectError, RawObjectData, slice_to_array};
 use logging::debug;
 
 /// The number type to use of the Int data object
@@ -22,25 +22,23 @@ impl From<isize> for Int {
 
 impl Object for Int {}
 
-impl Serialize<Vec<u8>> for Int {
-    fn serialize(self) -> Result<Vec<u8>, SerializeError> {
-        Ok(self.0.to_be_bytes().into())
-    }
-}
+impl TryFrom<RawObjectData> for Int {
+    type Error = ObjectError;
 
-impl Deserialize<&[u8]> for Int {
-    fn deserialize(source: &[u8]) -> Result<Box<Self>, DeserializeError> {
+    fn try_from(value: RawObjectData) -> Result<Self, Self::Error> {
+        let value = value.as_ref();
+
         // making sure there is exactly the correct amount of data
-        if source.len() < std::mem::size_of::<IntType>() {
+        if value.len() < std::mem::size_of::<IntType>() {
             debug!(
                 "Data recieved is too short for Int. Len recieved: {}",
-                source.len()
+                value.len()
             );
-            Err(DeserializeError::MalformedData)
+            Err(ObjectError::MissingData)
         } else {
-            Ok(Box::new(Self::new(IntType::from_be_bytes(unsafe {
-                slice_to_array(&source[..std::mem::size_of::<IntType>()])
-            }))))
+            Ok(Self::new(IntType::from_be_bytes(unsafe {
+                slice_to_array(&value[..std::mem::size_of::<IntType>()])
+            })))
         }
     }
 }

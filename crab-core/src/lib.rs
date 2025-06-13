@@ -11,6 +11,8 @@ pub mod text;
 pub enum ObjectError {
     /// There is not enough data to build a object
     MissingData,
+    /// The data provided is malformed
+    MalformedData,
 }
 
 /// The data type of the number used to store the data type
@@ -116,14 +118,14 @@ impl ObjectData {
 #[derive(Debug)]
 pub struct ObjectFactory<F>
 where
-    F: Fn(ObjectData) -> Box<dyn Object>,
+    F: Fn(RawObjectData) -> Box<dyn Object>,
 {
     creator: F,
 }
 
 impl<F> ObjectFactory<F>
 where
-    F: Fn(ObjectData) -> Box<dyn Object>,
+    F: Fn(RawObjectData) -> Box<dyn Object>,
 {
     /// Creates a new object factory
     pub fn new(creator: F) -> Self {
@@ -138,7 +140,7 @@ where
 
 /// Just shortand for the ObjectFactory that the TypeRegistry uses
 type TypeRegistryFactoryType =
-    ObjectFactory<Box<dyn Fn(ObjectData) -> Box<dyn Object> + Sync + Send>>;
+    ObjectFactory<Box<dyn Fn(RawObjectData) -> Box<dyn Object> + Sync + Send>>;
 
 /// Responsible for holding and managing mappings of type ids to methods to create the types
 pub struct TypeRegistry {

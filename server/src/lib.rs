@@ -29,7 +29,7 @@ pub enum Request {
     Get(Key),
     /// Sets data on a specific key
     // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the bytes data |
-    Set(Key, Object),
+    Set(Key, Box<dyn Object>),
     /// The connection is closed
     Terminated,
 }
@@ -45,7 +45,7 @@ pub enum ResponseError {
 #[derive(Debug)]
 pub enum Response {
     /// The request was successful and there is a payload
-    Payload(Object),
+    Payload(Box<dyn Object>),
     /// There was an error with the request
     Error,
 }

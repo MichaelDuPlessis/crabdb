@@ -7,27 +7,10 @@ pub mod int;
 pub mod null;
 pub mod text;
 
-/// Errors that can occur when deseriarlizing
-pub enum DeserializeError {
-    /// The type specified is invalid
-    InvalidType,
-    /// The data provided for the type is invalid
-    MalformedData,
-}
-
-/// Implementations of this trait must implement a way to convert some type to another type
-pub trait Deserialize<T> {
-    /// Converts from one type to another and returns that type along with what remains from the previous type
-    fn deserialize(source: T) -> Result<Box<Self>, DeserializeError>;
-}
-
-/// Errors that can occur when seriarlizing
-pub enum SerializeError {}
-
-/// Implementations of this tait must implement a way to serialize the type
-pub trait Serialize<T> {
-    /// Converts from a concrete type to another type that can be stored or sent
-    fn serialize(self) -> Result<T, SerializeError>;
+/// The kinds of errors that can occur around objects
+pub enum ObjectError {
+    /// There is not enough data to build a object
+    MissingData,
 }
 
 /// The data type of the number used to store the data type
@@ -72,18 +55,54 @@ where
 /// Anything that implements object is valid to store and retrieve from the database
 pub trait Object: std::fmt::Debug {}
 
+/// Data that can be used to create an object
+pub struct ObjectData {
+    type_id: ObjectType,
+    data: Vec<u8>,
+}
+
+impl ObjectData {
+    /// Creates a new object data from bytes
+    /// Note the only checking that occurs is if the the byte slice is long enough to have a type_id
+    /// This byte data should include the type id
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ObjectError> {
+        // checking if there are enough bytes for the type id
+        if bytes.len() < OBJECT_TYPE_NUM_BYTES {
+            return Err(ObjectError::MissingData);
+        }
+
+        let type_id =
+            ObjectType::from_be_bytes(unsafe { slice_to_array(&bytes[..OBJECT_TYPE_NUM_BYTES]) });
+
+        Ok(Self {
+            type_id,
+            data: bytes[OBJECT_TYPE_NUM_BYTES..].into(),
+        })
+    }
+
+    /// Returns a byte slice of the data that can be used to create objects
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Extract the type id from the data
+    pub fn type_id(&self) -> ObjectType {
+        self.type_id
+    }
+}
+
 /// Responsible for creating an object
 #[derive(Debug)]
 pub struct ObjectFactory<F>
 where
-    F: Fn(&[u8]) -> Box<dyn Object>,
+    F: Fn(ObjectData) -> Box<dyn Object>,
 {
     creator: F,
 }
 
 impl<F> ObjectFactory<F>
 where
-    F: Fn(&[u8]) -> Box<dyn Object>,
+    F: Fn(ObjectData) -> Box<dyn Object>,
 {
     /// Creates a new object factory
     pub fn new(creator: F) -> Self {
@@ -97,7 +116,8 @@ where
 }
 
 /// Just shortand for the ObjectFactory that the TypeRegistry uses
-type TypeRegistryFactoryType = ObjectFactory<Box<dyn Fn(&[u8]) -> Box<dyn Object> + Sync + Send>>;
+type TypeRegistryFactoryType =
+    ObjectFactory<Box<dyn Fn(ObjectData) -> Box<dyn Object> + Sync + Send>>;
 
 /// Responsible for holding and managing mappings of type ids to methods to create the types
 pub struct TypeRegistry {
@@ -138,8 +158,6 @@ pub fn register_factory(type_id: ObjectType, factory: TypeRegistryFactoryType) {
     REGISTRY.write().unwrap().add_factory(type_id, factory);
 }
 
-/// Create a new object using the appropriate ObjectFactory in the TypeRegistry
-/// If there is not ObjectFactory for the type id None is returned
-pub fn new_object(type_id: ObjectType, data: &[u8]) -> Option<Box<dyn Object>> {
-    Some(REGISTRY.read().unwrap().get_factory(type_id)?.create(data))
-}
+/// Creates a new object and derives the type id from the input data
+/// If no factory exists for the type id None is returned
+pub fn new_object(data: ObjectData) -> Result<Option<Box<dyn Object>>, ObjectError> {}

@@ -7,3 +7,4 @@ edition = "2024"
 server = { path = "../server" }
 storage = { path = "../storage" }
 threadpool = { path = "../threadpool" }
+logging = { path = "../logging" }

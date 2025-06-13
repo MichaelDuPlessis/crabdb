@@ -2,6 +2,7 @@
 
 use crate::RecieveError;
 use crab_core::{Deserialize, Key, Object, Serialize, slice_to_array};
+use logging::{debug, info, trace};
 use std::{
     io::{Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
@@ -89,7 +90,8 @@ impl TryFrom<&[u8]> for crate::Request {
     type Error = RecieveError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        // first determine the tyep of request sent
+        // first determine the type of request sent
+        debug!("Waiting for request");
         let request_type =
             RequestOpType::from_be_bytes(unsafe { slice_to_array(&value[..REQUEST_OP_LEN]) });
         let value = &value[REQUEST_OP_LEN..];
@@ -97,18 +99,34 @@ impl TryFrom<&[u8]> for crate::Request {
         match request_type {
             // GET
             // | 2 bytes key length (n) | n bytes key |
-            0 => Ok(crate::Request::Get(
-                Key::deserialize(value)
-                    .map(|(key, _)| key)
-                    .map_err(|_| RecieveError::InvalidKey)?,
-            )),
+            0 => {
+                trace!("Get request recieved");
+
+                let key = match Key::deserialize(value) {
+                    Ok((key, _)) => {
+                        info!("Recieved key: {key:?}");
+                        key
+                    }
+                    Err(_) => return Err(RecieveError::InvalidKey),
+                };
+
+                Ok(crate::Request::Get(key))
+            }
             // SET
             // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the data payload |
             1 => {
-                let (key, value) = Key::deserialize(value).map_err(|_| RecieveError::InvalidKey)?;
+                trace!("Set request recieved");
+                let key = match Key::deserialize(value) {
+                    Ok((key, _)) => {
+                        info!("Recieved key: {key:?}");
+                        key
+                    }
+                    Err(_) => return Err(RecieveError::InvalidKey),
+                };
 
                 let (object, _) =
                     Object::deserialize(value).map_err(|_| RecieveError::InvalidObject)?;
+                info!("Recieved object: {object:?}");
 
                 Ok(crate::Request::Set(key, object))
             }

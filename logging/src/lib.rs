@@ -1,10 +1,9 @@
+use chrono::Local;
 use std::io::Write;
 use std::{
     fmt::Display,
     sync::atomic::{AtomicU8, Ordering},
 };
-
-use chrono::Local;
 
 /// The available log levels
 /// A higher level will log itself an all log levels below it
@@ -45,7 +44,7 @@ pub fn init_logger(log_level: LogLevel) {
 }
 
 /// logs a message
-fn log(log_level: LogLevel, msg: std::fmt::Arguments) {
+pub fn log(log_level: LogLevel, msg: std::fmt::Arguments) {
     // checking if the log level is correct
     if log_level as u8 <= LOG_LEVEL.load(Ordering::Relaxed) {
         // getting the file the error occured
@@ -72,6 +71,7 @@ fn log(log_level: LogLevel, msg: std::fmt::Arguments) {
 }
 
 /// Log an error
+#[macro_export]
 macro_rules! error {
     ($($args:tt)*) => {
         $crate::log($crate::LogLevel::Error, std::format_args!($($args)*));
@@ -79,6 +79,7 @@ macro_rules! error {
 }
 
 /// Log a warning
+#[macro_export]
 macro_rules! warn {
     ($($args:tt)*) => {
         $crate::log($crate::LogLevel::Error, std::format_args!($($args)*));
@@ -86,6 +87,7 @@ macro_rules! warn {
 }
 
 /// Log a debug
+#[macro_export]
 macro_rules! debug {
     ($($args:tt)*) => {
         $crate::log($crate::LogLevel::Error, std::format_args!($($args)*));
@@ -93,6 +95,7 @@ macro_rules! debug {
 }
 
 /// Log a info
+#[macro_export]
 macro_rules! info {
     ($($args:tt)*) => {
         $crate::log($crate::LogLevel::Error, std::format_args!($($args)*));
@@ -100,6 +103,7 @@ macro_rules! info {
 }
 
 /// Log a trace
+#[macro_export]
 macro_rules! trace {
     ($($args:tt)*) => {
         $crate::log($crate::LogLevel::Error, std::format_args!($($args)*));

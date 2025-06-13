@@ -72,6 +72,7 @@ version = "0.1.0"
 name = "engine"
 version = "0.1.0"
 dependencies = [
+ "logging",
  "server",
  "storage",
  "threadpool",
@@ -174,6 +175,7 @@ name = "server"
 version = "0.1.0"
 dependencies = [
  "crab-core",
+ "logging",
 ]
 
 [[package]]

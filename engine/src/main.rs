@@ -1,3 +1,4 @@
+use logging::{debug, error, init_logger};
 use server::{Connection, Response, Server, tcp_server::TcpServer};
 use storage::{Storage, in_memory_store::InMemoryStore};
 
@@ -17,12 +18,20 @@ impl<S: Server, D: Storage> Engine<S, D> {
     fn start(&mut self) -> Result<(), ()> {
         loop {
             // waiting for a connection
+            debug!("Waiting for connection");
             let mut connection = self.server.listen();
+            debug!("Connection recieved");
 
             // Now that a connection has been made continously recieve data
             loop {
                 // recieving data
-                let request = connection.receive().unwrap();
+                let request = match connection.receive() {
+                    Ok(request) => request,
+                    Err(e) => {
+                        error!("An error occured when recieving a request: {e:?}");
+                        break;
+                    }
+                };
 
                 // seeing what kind of request is made
                 let response = match request {
@@ -36,13 +45,19 @@ impl<S: Server, D: Storage> Engine<S, D> {
                     Err(_) => Response::Error,
                 };
 
-                connection.send(response).unwrap()
+                if let Err(e) = connection.send(response) {
+                    error!("An error occured when sending a response: {e:?}");
+                    break;
+                }
             }
         }
     }
 }
 
 fn main() {
+    // intializig logger
+    init_logger(logging::LogLevel::Trace);
+
     let server = TcpServer::default();
     let storage = InMemoryStore::default();
     let mut engine = Engine::new(server, storage);

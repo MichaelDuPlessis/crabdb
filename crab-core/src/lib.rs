@@ -13,6 +13,8 @@ pub enum ObjectError {
     MissingData,
     /// The data provided is malformed
     MalformedData,
+    /// There is not factory for the specified type_id
+    MissingFactory,
 }
 
 /// The data type of the number used to store the data type
@@ -118,14 +120,14 @@ impl ObjectData {
 #[derive(Debug)]
 pub struct ObjectFactory<F>
 where
-    F: Fn(RawObjectData) -> Box<dyn Object>,
+    F: Fn(RawObjectData) -> Result<Box<dyn Object>, ObjectError>,
 {
     creator: F,
 }
 
 impl<F> ObjectFactory<F>
 where
-    F: Fn(RawObjectData) -> Box<dyn Object>,
+    F: Fn(RawObjectData) -> Result<Box<dyn Object>, ObjectError>,
 {
     /// Creates a new object factory
     pub fn new(creator: F) -> Self {
@@ -133,14 +135,14 @@ where
     }
 
     /// Creates an object
-    pub fn create(&self, data: &[u8]) -> Box<dyn Object> {
+    pub fn create(&self, data: &[u8]) -> Result<Box<dyn Object>, ObjectError> {
         (self.creator)(data)
     }
 }
 
 /// Just shortand for the ObjectFactory that the TypeRegistry uses
 type TypeRegistryFactoryType =
-    ObjectFactory<Box<dyn Fn(RawObjectData) -> Box<dyn Object> + Sync + Send>>;
+    ObjectFactory<Box<dyn Fn(RawObjectData) -> Result<Box<dyn Object>, ObjectError> + Sync + Send>>;
 
 /// Responsible for holding and managing mappings of type ids to methods to create the types
 pub struct TypeRegistry {
@@ -182,5 +184,11 @@ pub fn register_factory(type_id: ObjectType, factory: TypeRegistryFactoryType) {
 }
 
 /// Creates a new object and derives the type id from the input data
-/// If no factory exists for the type id None is returned
-pub fn new_object(data: ObjectData) -> Result<Option<Box<dyn Object>>, ObjectError> {}
+pub fn new_object(object_data: ObjectData) -> Result<Box<dyn Object>, ObjectError> {
+    // getting the factory
+    let Some(factory) = REGISTRY.read().unwrap().get_factory(object_data.type_id) else {
+        return Err(ObjectError::MissingFactory);
+    };
+
+    factory.create(object_data.data())
+}

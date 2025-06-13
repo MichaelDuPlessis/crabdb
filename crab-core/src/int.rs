@@ -29,7 +29,7 @@ impl Serialize<Vec<u8>> for Int {
 }
 
 impl Deserialize<&[u8]> for Int {
-    fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
+    fn deserialize(source: &[u8]) -> Result<Box<Self>, DeserializeError> {
         // making sure there is exactly the correct amount of data
         if source.len() < std::mem::size_of::<IntType>() {
             debug!(
@@ -38,12 +38,9 @@ impl Deserialize<&[u8]> for Int {
             );
             Err(DeserializeError::MalformedData)
         } else {
-            Ok((
-                Self::new(IntType::from_be_bytes(unsafe {
-                    slice_to_array(&source[..std::mem::size_of::<IntType>()])
-                })),
-                &source[..std::mem::size_of::<IntType>()],
-            ))
+            Ok(Box::new(Self::new(IntType::from_be_bytes(unsafe {
+                slice_to_array(&source[..std::mem::size_of::<IntType>()])
+            }))))
         }
     }
 }

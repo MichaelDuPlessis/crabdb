@@ -1,6 +1,5 @@
+use crate::{Deserialize, DeserializeError, Object, Serialize, SerializeError, slice_to_array};
 use logging::trace;
-
-use crate::{Deserialize, DeserializeError, Serialize, SerializeError, slice_to_array};
 
 /// The number type that is used to determine the length of the text data type
 type TextLenType = u16;
@@ -24,6 +23,8 @@ impl From<String> for Text {
     }
 }
 
+impl Object for Text {}
+
 impl Serialize<Vec<u8>> for Text {
     fn serialize(self) -> Result<Vec<u8>, SerializeError> {
         let mut text = Vec::with_capacity(self.0.len() + TEXT_LEN_TYPE_NUM_BYTES);
@@ -35,7 +36,7 @@ impl Serialize<Vec<u8>> for Text {
 }
 
 impl Deserialize<&[u8]> for Text {
-    fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
+    fn deserialize(source: &[u8]) -> Result<Box<Self>, DeserializeError> {
         // making sure there is enough data
         if source.len() < TEXT_LEN_TYPE_NUM_BYTES {
             return Err(DeserializeError::MalformedData);
@@ -60,6 +61,6 @@ impl Deserialize<&[u8]> for Text {
             .to_owned();
 
         trace!("Text {text}");
-        Ok((Text::new(text), &source[text_len..]))
+        Ok(Box::new(Text::new(text)))
     }
 }

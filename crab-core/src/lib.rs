@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 pub mod int;
 pub mod text;
 
@@ -10,9 +12,9 @@ pub enum DeserializeError {
 }
 
 /// Implementations of this trait must implement a way to convert some type to another type
-pub trait Deserialize<T>: Sized {
+pub trait Deserialize<T> {
     /// Converts from one type to another and returns that type along with what remains from the previous type
-    fn deserialize(source: T) -> Result<(Self, T), DeserializeError>;
+    fn deserialize(source: T) -> Result<Box<Self>, DeserializeError>;
 }
 
 /// Errors that can occur when seriarlizing
@@ -64,4 +66,66 @@ where
 }
 
 /// Anything that implements object is valid to store and retrieve from the database
-pub trait Object: std::fmt::Debug + Serialize<Vec<u8>> + for<'a> Deserialize<&'a [u8]> {}
+pub trait Object: std::fmt::Debug {}
+
+/// Responsible for creating an object
+pub struct ObjectFactory<F>
+where
+    F: Fn(&[u8]) -> Box<dyn Object>,
+{
+    creator: F,
+}
+
+impl<F> ObjectFactory<F>
+where
+    F: Fn(&[u8]) -> Box<dyn Object>,
+{
+    /// Creates a new object factory
+    pub fn new(creator: F) -> Self {
+        Self { creator }
+    }
+
+    /// Creates an object
+    pub fn create(&self, data: &[u8]) -> Box<dyn Object> {
+        (self.creator)(data)
+    }
+}
+
+/// Responsible for holding and managing mappings of type ids to methods to create the types
+pub struct TypeRegistry<F>
+where
+    F: Fn(&[u8]) -> Box<dyn Object>,
+{
+    registry: HashMap<ObjectType, ObjectFactory<F>>,
+}
+
+impl<F> TypeRegistry<F>
+where
+    F: Fn(&[u8]) -> Box<dyn Object>,
+{
+    /// Creates a new type registry
+    pub fn new() -> Self {
+        Self {
+            registry: HashMap::new(),
+        }
+    }
+
+    /// Inserts a factory into the registry with an associated type id
+    pub fn add_factory(&mut self, type_id: ObjectType, factory: ObjectFactory<F>) {
+        self.registry.insert(type_id, factory);
+    }
+
+    /// Gets a ObjectFactory from the registry
+    pub fn get_factory(&self, type_id: ObjectType) -> Option<&ObjectFactory<F>> {
+        self.registry.get(&type_id)
+    }
+}
+
+impl<F> Default for TypeRegistry<F>
+where
+    F: Fn(&[u8]) -> Box<dyn Object>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}

@@ -1,4 +1,9 @@
-use logging::{debug, trace};
+use int::Int;
+use logging::trace;
+use text::Text;
+
+mod int;
+mod text;
 
 /// Errors that can occur when deseriarlizing
 pub enum DeserializeError {
@@ -59,129 +64,6 @@ where
 {
     fn from(value: T) -> Self {
         Self::new(value)
-    }
-}
-
-/// The number type to use of the Int data object
-type IntType = isize;
-/// The Int data type. It is internally reprsented as an isize.
-#[derive(Debug, Clone)]
-pub struct Int(IntType);
-
-impl Int {
-    /// Creates a new Int from an isize
-    pub fn new(num: impl Into<IntType>) -> Self {
-        Self(num.into())
-    }
-
-    /// Creates a Int object
-    pub fn new_object(num: impl Into<IntType>) -> Object {
-        Object::Int(Self::new(num))
-    }
-}
-
-impl From<isize> for Int {
-    fn from(value: isize) -> Self {
-        Self::new(value)
-    }
-}
-
-impl Serialize<Vec<u8>> for Int {
-    fn serialize(self) -> Result<Vec<u8>, SerializeError> {
-        let mut int = [0; OBJECT_TYPE_NUM_BYTES + std::mem::size_of::<IntType>()];
-        int[..OBJECT_TYPE_NUM_BYTES].copy_from_slice(&Object::INT_TAG.to_be_bytes());
-        int[OBJECT_TYPE_NUM_BYTES..].copy_from_slice(&self.0.to_be_bytes());
-
-        Ok(int.into())
-    }
-}
-
-impl Deserialize<&[u8]> for Int {
-    fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
-        // making sure there is exactly the correct amount of data
-        if source.len() < std::mem::size_of::<IntType>() {
-            debug!(
-                "Data recieved is too short for Int. Len recieved: {}",
-                source.len()
-            );
-            Err(DeserializeError::MalformedData)
-        } else {
-            Ok((
-                Self::new(IntType::from_be_bytes(unsafe {
-                    slice_to_array(&source[..std::mem::size_of::<IntType>()])
-                })),
-                &source[..std::mem::size_of::<IntType>()],
-            ))
-        }
-    }
-}
-
-/// The number type that is used to determine the length of the text data type
-type TextLenType = u16;
-/// The number of bytes used to store the length of the text data type
-const TEXT_LEN_TYPE_NUM_BYTES: usize = std::mem::size_of::<TextLenType>();
-
-/// The Text data type. It is internally reprsented as an String.
-#[derive(Debug, Clone)]
-pub struct Text(String);
-
-impl Text {
-    /// Creates a new Text from a String
-    pub fn new(text: impl Into<String>) -> Self {
-        Self(text.into())
-    }
-
-    /// Creates a Text object
-    pub fn new_object(text: impl Into<String>) -> Object {
-        Object::Text(Self::new(text))
-    }
-}
-
-impl From<String> for Text {
-    fn from(value: String) -> Self {
-        Self::new(value)
-    }
-}
-
-impl Serialize<Vec<u8>> for Text {
-    fn serialize(self) -> Result<Vec<u8>, SerializeError> {
-        let mut text =
-            Vec::with_capacity(OBJECT_TYPE_NUM_BYTES + self.0.len() + TEXT_LEN_TYPE_NUM_BYTES);
-        text.extend_from_slice(&Object::TEXT_TAG.to_be_bytes());
-        text.extend_from_slice(&(self.0.len() as TextLenType).to_be_bytes());
-        text.extend_from_slice(&self.0.as_bytes());
-
-        Ok(text)
-    }
-}
-
-impl Deserialize<&[u8]> for Text {
-    fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
-        // making sure there is enough data
-        if source.len() < TEXT_LEN_TYPE_NUM_BYTES {
-            return Err(DeserializeError::MalformedData);
-        }
-
-        // extracting text length
-        let text_len = TextLenType::from_be_bytes(unsafe {
-            slice_to_array(&source[..TEXT_LEN_TYPE_NUM_BYTES])
-        }) as usize;
-        trace!("Text len: {text_len}");
-
-        // making sure there is enough bytes left
-        let source = &source[TEXT_LEN_TYPE_NUM_BYTES..];
-
-        if source.len() < text_len {
-            return Err(DeserializeError::MalformedData);
-        }
-
-        // try and convert byte slice to string
-        let text = str::from_utf8(&source[..text_len])
-            .map_err(|_| DeserializeError::MalformedData)?
-            .to_owned();
-
-        trace!("Text {text}");
-        Ok((Text::new(text), &source[text_len..]))
     }
 }
 

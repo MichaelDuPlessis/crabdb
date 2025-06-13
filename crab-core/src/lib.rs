@@ -3,6 +3,8 @@ use std::{
     sync::{LazyLock, RwLock},
 };
 
+use logging::trace;
+
 pub mod int;
 pub mod null;
 pub mod text;
@@ -47,12 +49,36 @@ impl Key {
     }
 }
 
-impl<T> From<T> for Key
-where
-    T: Into<String>,
-{
-    fn from(value: T) -> Self {
-        Self::new(value)
+impl TryFrom<&[u8]> for Key {
+    type Error = ObjectError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        trace!("Deserializing key");
+
+        // first check if the size is large enough
+        if value.len() < KEY_LEN_TYPE_NUM_BYTES {
+            return Err(ObjectError::MissingData);
+        }
+
+        // extracting text length
+        let key_len =
+            KeyLenType::from_be_bytes(unsafe { slice_to_array(&value[..KEY_LEN_TYPE_NUM_BYTES]) })
+                as usize;
+        trace!("Key len: {key_len}");
+
+        // making sure there is enough bytes left
+        let value = &value[KEY_LEN_TYPE_NUM_BYTES..];
+
+        if value.len() < key_len {
+            return Err(ObjectError::MissingData);
+        }
+
+        // try and convert byte slice to string
+        let key = str::from_utf8(&value[..key_len])
+            .map_err(|_| ObjectError::MalformedData)?
+            .to_owned();
+
+        Ok(Key::new(key))
     }
 }
 
@@ -186,7 +212,8 @@ pub fn register_factory(type_id: ObjectType, factory: TypeRegistryFactoryType) {
 /// Creates a new object and derives the type id from the input data
 pub fn new_object(object_data: ObjectData) -> Result<Box<dyn Object>, ObjectError> {
     // getting the factory
-    let Some(factory) = REGISTRY.read().unwrap().get_factory(object_data.type_id) else {
+    let registry = REGISTRY.read().unwrap();
+    let Some(factory) = registry.get_factory(object_data.type_id) else {
         return Err(ObjectError::MissingFactory);
     };
 

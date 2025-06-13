@@ -102,8 +102,8 @@ impl TryFrom<&[u8]> for crate::Request {
             0 => {
                 trace!("Get request recieved");
 
-                let key = match Key::deserialize(value) {
-                    Ok((key, _)) => {
+                let key = match Key::try_from(value) {
+                    Ok(key) => {
                         info!("Recieved key: {key:?}");
                         key
                     }
@@ -116,10 +116,10 @@ impl TryFrom<&[u8]> for crate::Request {
             // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the data payload |
             1 => {
                 trace!("Set request recieved");
-                let (key, value) = match Key::deserialize(value) {
-                    Ok((key, value)) => {
+                let key = match Key::try_from(value) {
+                    Ok(key) => {
                         info!("Recieved key: {key:?}");
-                        (key, value)
+                        key
                     }
                     Err(_) => return Err(RecieveError::InvalidKey),
                 };

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 # This code was written by an LLM. I couldn't be bothered to write simple test
-# program from scratchimport socket
-
+# program from scratch
 import socket
 import struct
 import argparse
@@ -25,33 +24,72 @@ DATA_TYPE_MAP = {
 }
 
 
-def send_and_receive(host, port, payload):
+def _read_full_response(sock):
     """
-    Establishes a TCP connection, sends the payload, and reads the full response
-    based on the updated, conditional response protocol.
+    Reads the full response from the socket based on the 8-byte length prefix.
+    Returns (response_data_content, response_total_len) or (None, error_message) on error.
+    """
+    try:
+        # Read the 8-byte response length
+        len_bytes = sock.recv(8)
+        if not len_bytes:
+            return None, "Error: Did not receive response length from server. Connection closed?"
+        if len(len_bytes) < 8:
+            return None, f"Error: Incomplete length header received. Expected 8 bytes, got {len(len_bytes)}."
+        response_total_len = struct.unpack('>Q', len_bytes)[0]
+
+        # Read the remaining response data as indicated by response_total_len
+        response_data_content = b''
+        bytes_received = 0
+        while bytes_received < response_total_len:
+            # Read in chunks, ensure we don't try to read more than available or remaining
+            chunk = sock.recv(min(response_total_len - bytes_received, 4096))
+            if not chunk:
+                return None, "Error: Connection closed prematurely by server while reading response data content."
+            response_data_content += chunk
+            bytes_received += len(chunk)
+
+        return response_data_content, response_total_len
+    except socket.error as e:
+        return None, f"Socket communication error: {e}"
+    except Exception as e:
+        return None, f"An unexpected error occurred during response reading: {e}"
+
+
+def execute_command_on_socket(sock, payload):
+    """
+    Sends a payload on an *existing, open* socket and reads the response.
+    Returns the parsed response string.
+    """
+    try:
+        sock.sendall(payload)
+        response_data_content, response_total_len = _read_full_response(sock)
+
+        if response_data_content is None:
+            # _read_full_response returned an error string in response_total_len
+            return response_total_len
+
+        return parse_server_response(response_data_content, response_total_len)
+    except socket.error as e:
+        return f"Socket communication error: {e}"
+    except Exception as e:
+        return f"An unexpected error occurred during command execution: {e}"
+
+
+def execute_command_once(host, port, payload):
+    """
+    Establishes a new TCP connection, sends the payload, reads the response,
+    and then closes the connection. Suitable for single commands.
     """
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((host, port))
+            # <--- THIS LINE WAS MISSING AND HAS BEEN ADDED BACK
             s.sendall(payload)
+            response_data_content, response_total_len = _read_full_response(s)
 
-            # Read the 8-byte response length (always the first part of any response)
-            len_bytes = s.recv(8)
-            if not len_bytes:
-                return "Error: Did not receive response length from server. Connection closed?"
-            if len(len_bytes) < 8:
-                return f"Error: Incomplete length header received. Expected 8 bytes, got {len(len_bytes)}."
-            response_total_len = struct.unpack('>Q', len_bytes)[0]
-
-            # Read the remaining response data as indicated by response_total_len
-            response_data_content = b''
-            bytes_received = 0
-            while bytes_received < response_total_len:
-                chunk = s.recv(min(response_total_len - bytes_received, 4096))
-                if not chunk:
-                    return "Error: Connection closed prematurely by server while reading response data content."
-                response_data_content += chunk
-                bytes_received += len(chunk)
+            if response_data_content is None:
+                return response_total_len  # Contains the error message from _read_full_response
 
             return parse_server_response(response_data_content, response_total_len)
     except socket.error as e:
@@ -171,130 +209,174 @@ def construct_get_payload(key):
 
 def interactive_mode(initial_host, initial_port):
     """
-    Runs the CLI client in interactive mode.
+    Runs the CLI client in interactive mode, keeping the database connection open.
     """
     current_host = initial_host
     current_port = initial_port
+    db_socket = None
 
-    print(f"Entering interactive mode. Current server: {
-          current_host}:{current_port}")
+    def establish_connection():
+        nonlocal db_socket
+        if db_socket:
+            try:
+                db_socket.close()
+                print("Closing existing connection.")
+            except socket.error as e:
+                print(f"Error closing existing socket: {e}", file=sys.stderr)
+            db_socket = None
+
+        print(f"Attempting to connect to {current_host}:{current_port}...")
+        try:
+            new_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            new_socket.connect((current_host, current_port))
+            db_socket = new_socket
+            print("Connection established.")
+            return True
+        except socket.error as e:
+            print(f"Failed to connect to {current_host}:{
+                  current_port}: {e}", file=sys.stderr)
+            db_socket = None
+            return False
+        except Exception as e:
+            print(f"An unexpected error occurred during connection: {
+                  e}", file=sys.stderr)
+            db_socket = None
+            return False
+
+    # Establish initial connection
+    if not establish_connection():
+        print("Starting interactive mode without an active connection. Use 'connect' to establish one.")
+
+    print("\nEntering interactive mode.")
     print("Commands: set <key> <value> --type <int|text|null> | get <key> | connect <host>:<port> | exit | quit")
     print("Quote values with spaces, e.g., set \"my key\" \"my value\" --type text")
 
-    while True:
-        try:
-            user_input = input(
-                f"CrabDB ({current_host}:{current_port})> ").strip()
-            if not user_input:
-                continue
-
-            parts = shlex.split(user_input)
-            command = parts[0].lower()
-
-            if command in ['exit', 'quit']:
-                print("Exiting interactive mode.")
-                break
-            elif command == 'connect':
-                if len(parts) == 2:
-                    try:
-                        host_port_str = parts[1]
-                        if ':' in host_port_str:
-                            new_host, new_port_str = host_port_str.split(':')
-                            new_port = int(new_port_str)
-                            current_host = new_host
-                            current_port = new_port
-                            print(f"Server changed to {
-                                  current_host}:{current_port}")
-                        else:
-                            print(
-                                "Invalid connect format. Use: connect <host>:<port>")
-                    except ValueError:
-                        print("Invalid port number.")
-                    except Exception as e:
-                        print(f"Error changing connection: {e}")
-                else:
-                    print("Usage: connect <host>:<port>")
-            elif command == 'set':
-                if '--type' not in parts:
-                    print("Error: Missing --type argument for set command.")
+    try:
+        while True:
+            try:
+                # Update prompt to show connection status
+                status_indicator = ' disconnected' if db_socket is None else ''
+                user_input = input(f"CrabDB ({current_host}:{current_port}{
+                                   status_indicator})> ").strip()
+                if not user_input:
                     continue
 
-                try:
-                    type_arg_index = parts.index('--type')
-                    if type_arg_index + 1 >= len(parts):
+                parts = shlex.split(user_input)
+                command = parts[0].lower()
+
+                if command in ['exit', 'quit']:
+                    print("Exiting interactive mode.")
+                    break
+                elif command == 'connect':
+                    if len(parts) == 2:
+                        try:
+                            host_port_str = parts[1]
+                            if ':' in host_port_str:
+                                new_host, new_port_str = host_port_str.split(
+                                    ':')
+                                new_port = int(new_port_str)
+                                current_host = new_host
+                                current_port = new_port
+                                establish_connection()  # Attempt to connect to new host/port
+                            else:
+                                print(
+                                    "Invalid connect format. Use: connect <host>:<port>")
+                        except ValueError:
+                            print("Invalid port number.")
+                        except Exception as e:
+                            print(f"Error changing connection: {e}")
+                    else:
+                        print("Usage: connect <host>:<port>")
+                elif command == 'set':
+                    if db_socket is None:
                         print(
-                            "Error: --type argument requires a value (int, text, null).")
+                            "Error: Not connected to the database. Use 'connect' first.")
                         continue
 
-                    cmd_type = parts[type_arg_index + 1].lower()
-                    if cmd_type not in DATA_TYPE_MAP:
-                        print(f"Error: Invalid type '{
-                              cmd_type}'. Must be int, text, or null.")
+                    if '--type' not in parts:
+                        print("Error: Missing --type argument for set command.")
                         continue
 
-                    if type_arg_index < 2:  # Not enough parts for key and value before --type
+                    try:
+                        type_arg_index = parts.index('--type')
+                        if type_arg_index + 1 >= len(parts):
+                            print(
+                                "Error: --type argument requires a value (int, text, null).")
+                            continue
+
+                        cmd_type = parts[type_arg_index + 1].lower()
+                        if cmd_type not in DATA_TYPE_MAP:
+                            print(f"Error: Invalid type '{
+                                  cmd_type}'. Must be int, text, or null.")
+                            continue
+
+                        # Ensure enough parts for key and value before --type
+                        # e.g., ['set', 'key', 'value', '--type', 'text'] => parts[1] is key, parts[2] is value
+                        if type_arg_index < 2:
+                            print(
+                                "Error: Invalid format for set. Usage: set <key> <value> --type <type>")
+                            continue
+
+                        key = parts[1]
+                        # Join all parts between the key and '--type' as the value
+                        value = ' '.join(parts[2:type_arg_index])
+
+                        value_type_code = DATA_TYPE_MAP[cmd_type]
+
+                        if value_type_code == TYPE_NULL:
+                            value_to_send = ''  # Value string is ignored for Null type
+                        else:
+                            value_to_send = value
+
+                        payload = construct_set_payload(
+                            key, value_to_send, value_type_code)
+                        print(f"Sending SET request for key='{key}'...")
+                        response = execute_command_on_socket(
+                            db_socket, payload)
+                        print("--- Server Response ---")
+                        print(response)
+
+                    except ValueError as ve:
+                        print(f"Error parsing set command: {ve}")
+                    except IndexError:
                         print(
                             "Error: Invalid format for set. Usage: set <key> <value> --type <type>")
+                    except Exception as e:
+                        print(f"An unexpected error occurred during set: {e}")
+
+                elif command == 'get':
+                    if db_socket is None:
+                        print(
+                            "Error: Not connected to the database. Use 'connect' first.")
+                        continue
+
+                    if len(parts) != 2:
+                        print("Usage: get <key>")
                         continue
 
                     key = parts[1]
-                    # The value is all parts between the key (index 1) and '--type'
-                    # shlex.split handles quoting, so `parts[2]` will be the full value string
-                    # if only 1 value part. If value itself contains spaces, `parts[2]` could be the whole string.
-                    # We expect `parts` to be `['set', 'key', 'value', '--type', 'type_val']`
-                    # So, value is `parts[2]`
-                    if type_arg_index == 2:  # This means no value provided between key and --type
-                        print(
-                            "Error: Invalid format for set. Value is missing. Usage: set <key> <value> --type <type>")
-                        continue
-
-                    # Join all parts identified as value
-                    value = ' '.join(parts[2:type_arg_index])
-
-                    value_type_code = DATA_TYPE_MAP[cmd_type]
-
-                    if value_type_code == TYPE_NULL:
-                        value_to_send = ''  # Value string is ignored for Null type
-                    else:
-                        value_to_send = value
-
-                    payload = construct_set_payload(
-                        key, value_to_send, value_type_code)
-                    print(f"Sending SET request for key='{key}'...")
-                    response = send_and_receive(
-                        current_host, current_port, payload)
+                    payload = construct_get_payload(key)
+                    print(f"Sending GET request for key='{key}'...")
+                    response = execute_command_on_socket(db_socket, payload)
                     print("--- Server Response ---")
                     print(response)
 
-                except ValueError as ve:
-                    print(f"Error parsing set command: {ve}")
-                except IndexError:
-                    print(
-                        "Error: Invalid format for set. Usage: set <key> <value> --type <type>")
-                except Exception as e:
-                    print(f"An unexpected error occurred during set: {e}")
+                else:
+                    print(f"Unknown command: '{command}'.")
 
-            elif command == 'get':
-                if len(parts) != 2:
-                    print("Usage: get <key>")
-                    continue
-
-                key = parts[1]
-                payload = construct_get_payload(key)
-                print(f"Sending GET request for key='{key}'...")
-                response = send_and_receive(
-                    current_host, current_port, payload)
-                print("--- Server Response ---")
-                print(response)
-
-            else:
-                print(f"Unknown command: '{command}'.")
-
-        except EOFError:  # User pressed Ctrl+D
-            print("\nExiting interactive mode.")
-            break
-        except Exception as e:
-            print(f"An unhandled error occurred in interactive mode: {e}")
+            except EOFError:  # User pressed Ctrl+D
+                print("\nExiting interactive mode.")
+                break
+            except Exception as e:
+                print(f"An unhandled error occurred in interactive mode: {e}")
+    finally:
+        # Ensure the socket is closed when interactive mode exits for any reason
+        if db_socket:
+            try:
+                db_socket.close()
+                print("Database connection closed.")
+            except socket.error as e:
+                print(f"Error closing socket on exit: {e}", file=sys.stderr)
 
 
 def main():
@@ -304,7 +386,7 @@ def main():
     """
     parser = argparse.ArgumentParser(
         description="CLI client for a custom TCP database.",
-        formatter_class=argparse.RawTextHelpFormatter  # For multiline help text
+        formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument('--host', default='127.0.0.1',
                         help='The server host address (default: 127.0.0.1).\n'
@@ -363,7 +445,8 @@ def main():
             if payload:
                 print(f"Sending {len(payload)} bytes to {
                       args.host}:{args.port}")
-                parsed_response = send_and_receive(
+                # Use execute_command_once for single command execution
+                parsed_response = execute_command_once(
                     args.host, args.port, payload)
                 print("\n--- Server Response ---")
                 print(parsed_response)

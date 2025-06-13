@@ -34,6 +34,7 @@ impl<S: Server, D: Storage> Engine<S, D> {
                 };
 
                 // seeing what kind of request is made
+                debug!("Sending response");
                 let response = match request {
                     server::Request::Get(key) => self.storage.get(key),
                     server::Request::Set(key, object) => self.storage.set(key, object),

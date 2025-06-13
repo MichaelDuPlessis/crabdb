@@ -1,3 +1,5 @@
+use logging::{debug, trace};
+
 /// Errors that can occur when deseriarlizing
 pub enum DeserializeError {
     /// The type specified is invalid
@@ -98,6 +100,10 @@ impl Deserialize<&[u8]> for Int {
     fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
         // making sure there is exactly the correct amount of data
         if source.len() < std::mem::size_of::<IntType>() {
+            debug!(
+                "Data recieved is too short for Int. Len recieved: {}",
+                source.len()
+            );
             Err(DeserializeError::MalformedData)
         } else {
             Ok((
@@ -139,9 +145,11 @@ impl From<String> for Text {
 
 impl Serialize<Vec<u8>> for Text {
     fn serialize(self) -> Result<Vec<u8>, SerializeError> {
-        let mut text = Vec::with_capacity(OBJECT_TYPE_NUM_BYTES + self.0.len());
-        text[..OBJECT_TYPE_NUM_BYTES].copy_from_slice(&Object::TEXT_TAG.to_be_bytes());
-        text[OBJECT_TYPE_NUM_BYTES..].copy_from_slice(&self.0.as_bytes());
+        let mut text =
+            Vec::with_capacity(OBJECT_TYPE_NUM_BYTES + self.0.len() + TEXT_LEN_TYPE_NUM_BYTES);
+        text.extend_from_slice(&Object::TEXT_TAG.to_be_bytes());
+        text.extend_from_slice(&(self.0.len() as TextLenType).to_be_bytes());
+        text.extend_from_slice(&self.0.as_bytes());
 
         Ok(text)
     }
@@ -155,7 +163,11 @@ impl Deserialize<&[u8]> for Text {
         }
 
         // extracting text length
-        let text_len = TextLenType::from_be_bytes(unsafe { slice_to_array(source) }) as usize;
+        let text_len = TextLenType::from_be_bytes(unsafe {
+            slice_to_array(&source[..TEXT_LEN_TYPE_NUM_BYTES])
+        }) as usize;
+        trace!("Text len: {text_len}");
+
         // making sure there is enough bytes left
         let source = &source[TEXT_LEN_TYPE_NUM_BYTES..];
 
@@ -167,6 +179,8 @@ impl Deserialize<&[u8]> for Text {
         let text = str::from_utf8(&source[..text_len])
             .map_err(|_| DeserializeError::MalformedData)?
             .to_owned();
+
+        trace!("Text {text}");
         Ok((Text::new(text), &source[text_len..]))
     }
 }
@@ -223,6 +237,8 @@ impl Serialize<Vec<u8>> for Object {
 
 impl Deserialize<&[u8]> for Object {
     fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
+        trace!("Deserializing object: {source:?}");
+
         // first check if the size is large enough
         if source.len() < 2 {
             return Err(DeserializeError::MalformedData);
@@ -231,6 +247,7 @@ impl Deserialize<&[u8]> for Object {
         let object_type =
             ObjectType::from_be_bytes(unsafe { slice_to_array(&source[..OBJECT_TYPE_NUM_BYTES]) });
         let source = &source[OBJECT_TYPE_NUM_BYTES..];
+        trace!("Object type: {object_type:?}");
 
         match object_type {
             Self::NULL_TAG => Ok((Self::Null, source)),
@@ -247,13 +264,19 @@ impl Deserialize<&[u8]> for Object {
 
 impl Deserialize<&[u8]> for Key {
     fn deserialize(source: &[u8]) -> Result<(Self, &[u8]), DeserializeError> {
+        trace!("Deserializing key");
+
         // first check if the size is large enough
         if source.len() < 2 {
             return Err(DeserializeError::MalformedData);
         }
 
         // extracting text length
-        let key_len = KeyLenType::from_be_bytes(unsafe { slice_to_array(source) }) as usize;
+        let key_len =
+            KeyLenType::from_be_bytes(unsafe { slice_to_array(&source[..KEY_LEN_TYPE_NUM_BYTES]) })
+                as usize;
+        trace!("Key len: {key_len}");
+
         // making sure there is enough bytes left
         let source = &source[KEY_LEN_TYPE_NUM_BYTES..];
 

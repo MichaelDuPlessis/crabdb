@@ -55,10 +55,31 @@ where
 /// Anything that implements object is valid to store and retrieve from the database
 pub trait Object: std::fmt::Debug {}
 
+/// The raw bytes that an object can be built from
+pub struct RawObjectData {
+    raw_data: Vec<u8>,
+}
+
+impl RawObjectData {
+    /// Creates a new RawObjectData from a byte slice
+    /// No error checking is performed
+    fn new(data: impl Into<Vec<u8>>) -> Self {
+        Self {
+            raw_data: data.into(),
+        }
+    }
+}
+
+impl AsRef<[u8]> for RawObjectData {
+    fn as_ref(&self) -> &[u8] {
+        &self.raw_data
+    }
+}
+
 /// Data that can be used to create an object
 pub struct ObjectData {
     type_id: ObjectType,
-    data: Vec<u8>,
+    data: RawObjectData,
 }
 
 impl ObjectData {

@@ -4,6 +4,7 @@ use std::{
 };
 
 pub mod int;
+pub mod null;
 pub mod text;
 
 /// Errors that can occur when deseriarlizing
@@ -133,7 +134,7 @@ static REGISTRY: LazyLock<RwLock<TypeRegistry>> =
     LazyLock::new(|| RwLock::new(TypeRegistry::default()));
 
 /// Adds a new ObjectFactory to the type registry
-pub fn new_factory(type_id: ObjectType, factory: TypeRegistryFactoryType) {
+pub fn register_factory(type_id: ObjectType, factory: TypeRegistryFactoryType) {
     REGISTRY.write().unwrap().add_factory(type_id, factory);
 }
 

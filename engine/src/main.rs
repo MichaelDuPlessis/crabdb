@@ -1,3 +1,4 @@
+use crab_core::{Deserialize, int::Int, null::Null, register_factory, text::Text};
 use logging::{debug, error, init_logger};
 use server::{Connection, Response, Server, tcp_server::TcpServer};
 use storage::{Storage, in_memory_store::InMemoryStore};
@@ -58,6 +59,11 @@ impl<S: Server, D: Storage> Engine<S, D> {
 fn main() {
     // intializig logger
     init_logger(logging::LogLevel::Trace);
+
+    // registring types
+    register_factory(0, |_| Null);
+    register_factory(1, Int::deserialize);
+    register_factory(2, Text::deserialize);
 
     let server = TcpServer::default();
     let storage = InMemoryStore::default();

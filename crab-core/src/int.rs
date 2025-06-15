@@ -12,6 +12,13 @@ impl Int {
     pub fn new(num: impl Into<IntType>) -> Self {
         Self(num.into())
     }
+
+    /// Creates a Boxe dyn Object from RawObject data
+    pub fn from_raw_object_data(
+        object_data: RawObjectData,
+    ) -> Result<Box<dyn Object>, <Self as TryFrom<RawObjectData>>::Error> {
+        Box::<Self>::try_from(object_data).map(|object| object as Box<dyn Object>)
+    }
 }
 
 impl From<isize> for Int {
@@ -25,7 +32,7 @@ impl Object for Int {
         Box::new(self.clone())
     }
 
-    fn into_raw_object_data(self) -> RawObjectData {
+    fn into_raw_object_data(&self) -> RawObjectData {
         RawObjectData::new(self.0.to_be_bytes())
     }
 }

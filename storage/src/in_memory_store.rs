@@ -1,10 +1,10 @@
 use crate::Storage;
-use crab_core::{Key, Object, null::Null};
+use crab_core::{DbObject, Key, new_null_db_object};
 use std::{borrow::Borrow, collections::HashMap};
 
 /// A storage medium that exists only in memory and does not persist data
 pub struct InMemoryStore {
-    map: HashMap<Key, Box<dyn Object>>,
+    map: HashMap<Key, DbObject>,
 }
 
 impl InMemoryStore {
@@ -23,17 +23,17 @@ impl Default for InMemoryStore {
 }
 
 impl Storage for InMemoryStore {
-    fn set(&mut self, key: Key, object: Box<dyn Object>) -> crate::Result<Box<dyn Object>> {
-        Ok(self.map.insert(key, object).unwrap_or(Box::new(Null)))
+    fn set(&mut self, key: Key, object: DbObject) -> crate::Result<DbObject> {
+        Ok(self.map.insert(key, object).unwrap_or(new_null_db_object()))
     }
 
-    fn get(&self, key: impl Borrow<Key>) -> crate::Result<Box<dyn Object>> {
+    fn get(&self, key: impl Borrow<Key>) -> crate::Result<DbObject> {
         let key = key.borrow();
-        Ok(self.map.get(key).cloned().unwrap_or(Box::new(Null)))
+        Ok(self.map.get(key).cloned().unwrap_or(new_null_db_object()))
     }
 
-    fn delete(&mut self, key: impl Borrow<Key>) -> crate::Result<Box<dyn Object>> {
+    fn delete(&mut self, key: impl Borrow<Key>) -> crate::Result<DbObject> {
         let key = key.borrow();
-        Ok(self.map.remove(key).unwrap_or(Box::new(Null)))
+        Ok(self.map.remove(key).unwrap_or(new_null_db_object()))
     }
 }

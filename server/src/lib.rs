@@ -1,6 +1,6 @@
 //! This module is responsible for handling recieving of requests and the sending respones
 
-use crab_core::{DbObject, Key, Object};
+use crab_core::{DbObject, Key, Object, ObjectData};
 
 pub mod tcp_server;
 
@@ -29,7 +29,7 @@ pub enum Request {
     Get(Key),
     /// Sets data on a specific key
     // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the bytes data |
-    Set(Key, Box<dyn Object>),
+    Set(Key, ObjectData),
     /// The connection is closed
     Terminated,
 }

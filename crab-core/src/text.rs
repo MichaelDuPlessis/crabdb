@@ -15,6 +15,13 @@ impl Text {
     pub fn new(text: impl Into<String>) -> Self {
         Self(text.into())
     }
+
+    /// Creates a Boxe dyn Object from RawObject data
+    pub fn from_raw_object_data(
+        object_data: RawObjectData,
+    ) -> Result<Box<dyn Object>, <Self as TryFrom<RawObjectData>>::Error> {
+        Box::<Self>::try_from(object_data).map(|object| object as Box<dyn Object>)
+    }
 }
 
 impl From<String> for Text {
@@ -28,7 +35,7 @@ impl Object for Text {
         Box::new(self.clone())
     }
 
-    fn into_raw_object_data(self) -> RawObjectData {
+    fn into_raw_object_data(&self) -> RawObjectData {
         let mut text = Vec::with_capacity(self.0.len() + TEXT_LEN_TYPE_NUM_BYTES);
         text.extend_from_slice(&(self.0.len() as TextLenType).to_be_bytes());
         text.extend_from_slice(&self.0.as_bytes());

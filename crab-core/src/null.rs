@@ -9,7 +9,7 @@ impl Object for Null {
         Box::new(self.clone())
     }
 
-    fn into_raw_object_data(self) -> crate::RawObjectData {
+    fn into_raw_object_data(&self) -> crate::RawObjectData {
         RawObjectData::new([])
     }
 }

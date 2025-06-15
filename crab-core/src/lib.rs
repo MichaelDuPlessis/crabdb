@@ -1,4 +1,5 @@
 use logging::trace;
+use null::Null;
 use std::{
     collections::HashMap,
     sync::{LazyLock, RwLock},
@@ -87,7 +88,7 @@ pub trait Object: std::fmt::Debug {
     fn boxed_clone(&self) -> Box<dyn Object>;
 
     /// Convert the Object to the objects raw data
-    fn into_raw_object_data(self) -> RawObjectData;
+    fn into_raw_object_data(&self) -> RawObjectData;
 }
 
 impl Clone for Box<dyn Object> {
@@ -97,6 +98,7 @@ impl Clone for Box<dyn Object> {
 }
 
 /// This is an object that is stored in the db
+#[derive(Debug)]
 pub struct DbObject {
     type_id: ObjectType,
     object: Box<dyn Object>,
@@ -106,6 +108,18 @@ impl DbObject {
     /// Creates a new DbObject
     pub fn new(type_id: ObjectType, object: Box<dyn Object>) -> Self {
         Self { type_id, object }
+    }
+
+    /// Convert the object data to raw bytes
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let raw_data = self.object.into_raw_object_data();
+        let raw_data = raw_data.as_ref();
+        let mut data = Vec::with_capacity(OBJECT_TYPE_NUM_BYTES + raw_data.len());
+
+        data.extend(self.type_id.to_be_bytes());
+        data.extend(raw_data);
+
+        data
     }
 }
 
@@ -119,6 +133,7 @@ impl Clone for DbObject {
 }
 
 /// The raw bytes that an object can be built from
+#[derive(Debug)]
 pub struct RawObjectData {
     raw_data: Vec<u8>,
 }
@@ -140,6 +155,7 @@ impl AsRef<[u8]> for RawObjectData {
 }
 
 /// Data that can be used to create an object
+#[derive(Debug)]
 pub struct ObjectData {
     type_id: ObjectType,
     data: RawObjectData,
@@ -172,6 +188,28 @@ impl ObjectData {
     /// Extract the type id from the data
     pub fn type_id(&self) -> ObjectType {
         self.type_id
+    }
+
+    /// Convert the object data to raw bytes
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let raw_data = self.data.as_ref();
+        let mut data = Vec::with_capacity(OBJECT_TYPE_NUM_BYTES + raw_data.len());
+
+        data.extend(self.type_id.to_be_bytes());
+        data.extend(raw_data);
+
+        data
+    }
+}
+
+impl From<DbObject> for ObjectData {
+    fn from(value: DbObject) -> Self {
+        let object = value.object;
+
+        Self {
+            type_id: value.type_id,
+            data: object.into_raw_object_data(),
+        }
     }
 }
 
@@ -256,4 +294,9 @@ pub fn new_db_object(object_data: ObjectData) -> Result<DbObject, ObjectError> {
     let object = factory.create(data)?;
 
     Ok(DbObject::new(type_id, object))
+}
+
+/// Creates a Null object
+pub fn new_null_db_object() -> DbObject {
+    DbObject::new(0, Box::new(Null))
 }

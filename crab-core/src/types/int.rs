@@ -39,6 +39,10 @@ impl Object for Int {
     fn into_raw_object_data(&self) -> RawObjectData {
         RawObjectData::new(self.0.to_be_bytes())
     }
+
+    fn type_name(&self) -> &'static str {
+        "int"
+    }
 }
 
 impl TryFrom<RawObjectData> for Int {

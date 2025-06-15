@@ -12,4 +12,8 @@ impl Object for Null {
     fn into_raw_object_data(&self) -> RawObjectData {
         RawObjectData::new([])
     }
+
+    fn type_name(&self) -> &'static str {
+        "null"
+    }
 }

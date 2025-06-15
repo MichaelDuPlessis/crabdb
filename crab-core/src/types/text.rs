@@ -46,6 +46,10 @@ impl Object for Text {
 
         RawObjectData::new(text)
     }
+
+    fn type_name(&self) -> &'static str {
+        "text"
+    }
 }
 
 impl TryFrom<RawObjectData> for Text {

@@ -22,6 +22,9 @@ pub trait Object: std::fmt::Debug {
 
     /// Convert the Object to the objects raw data
     fn into_raw_object_data(&self) -> RawObjectData;
+
+    /// Return the type_name for the object
+    fn type_name(&self) -> &'static str;
 }
 
 impl Clone for Box<dyn Object> {

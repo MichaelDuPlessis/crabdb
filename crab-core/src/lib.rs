@@ -82,7 +82,29 @@ pub fn extract_key(slice: &[u8]) -> Result<(Key, &[u8]), ObjectError> {
 }
 
 /// Anything that implements object is valid to store and retrieve from the database
-pub trait Object: std::fmt::Debug {}
+pub trait Object: std::fmt::Debug {
+    /// Creates a copy of a boxed object
+    fn boxed_clone(&self) -> Box<dyn Object>;
+}
+
+impl Clone for Box<dyn Object> {
+    fn clone(&self) -> Self {
+        self.boxed_clone()
+    }
+}
+
+/// This is an item that is stored in the db
+pub struct DbItem {
+    object: Box<dyn Object>,
+}
+
+impl Clone for DbItem {
+    fn clone(&self) -> Self {
+        Self {
+            object: self.object.boxed_clone(),
+        }
+    }
+}
 
 /// The raw bytes that an object can be built from
 pub struct RawObjectData {

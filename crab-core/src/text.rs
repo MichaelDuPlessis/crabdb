@@ -7,7 +7,7 @@ type TextLenType = u16;
 const TEXT_LEN_TYPE_NUM_BYTES: usize = std::mem::size_of::<TextLenType>();
 
 /// The Text data type. It is internally reprsented as an String.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Text(String);
 
 impl Text {
@@ -23,7 +23,11 @@ impl From<String> for Text {
     }
 }
 
-impl Object for Text {}
+impl Object for Text {
+    fn boxed_clone(&self) -> Box<dyn Object> {
+        Box::new(self.clone())
+    }
+}
 
 impl TryFrom<RawObjectData> for Text {
     type Error = ObjectError;

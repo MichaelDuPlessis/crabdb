@@ -27,9 +27,9 @@ impl Storage for InMemoryStore {
         Ok(self.map.insert(key, object).unwrap_or(Box::new(Null)))
     }
 
-    fn get(&self, key: impl Borrow<Key>) -> crate::Result<&Box<dyn Object>> {
+    fn get(&self, key: impl Borrow<Key>) -> crate::Result<Box<dyn Object>> {
         let key = key.borrow();
-        Ok(self.map.get(key).unwrap_or(&Box::new(Null)))
+        Ok(self.map.get(key).cloned().unwrap_or(Box::new(Null)))
     }
 
     fn delete(&mut self, key: impl Borrow<Key>) -> crate::Result<Box<dyn Object>> {

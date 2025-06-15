@@ -4,7 +4,7 @@ use logging::debug;
 /// The number type to use of the Int data object
 type IntType = isize;
 /// The Int data type. It is internally reprsented as an isize.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Int(IntType);
 
 impl Int {
@@ -20,7 +20,11 @@ impl From<isize> for Int {
     }
 }
 
-impl Object for Int {}
+impl Object for Int {
+    fn boxed_clone(&self) -> Box<dyn Object> {
+        Box::new(self.clone())
+    }
+}
 
 impl TryFrom<RawObjectData> for Int {
     type Error = ObjectError;

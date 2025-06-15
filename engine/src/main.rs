@@ -75,10 +75,16 @@ fn main() {
     // registring types
     register_factory(
         0,
-        ObjectFactory::new(Box::new(|_| Ok(Box::new(Null) as Box<dyn Object>))),
+        ObjectFactory::new("null", Box::new(|_| Ok(Box::new(Null) as Box<dyn Object>))),
     );
-    register_factory(1, ObjectFactory::new(Box::new(Int::from_raw_object_data)));
-    register_factory(2, ObjectFactory::new(Box::new(Text::from_raw_object_data)));
+    register_factory(
+        1,
+        ObjectFactory::new("int", Box::new(Int::from_raw_object_data)),
+    );
+    register_factory(
+        2,
+        ObjectFactory::new("text", Box::new(Text::from_raw_object_data)),
+    );
 
     let server = TcpServer::default();
     let storage = InMemoryStore::default();

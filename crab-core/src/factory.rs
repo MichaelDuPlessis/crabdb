@@ -14,6 +14,9 @@ pub struct ObjectFactory<F>
 where
     F: Fn(RawObjectData) -> Result<Box<dyn Object>, ObjectError>,
 {
+    /// The name of the data type that the factory makes
+    type_name: &'static str,
+    /// The function that creates the Object
     creator: F,
 }
 
@@ -22,8 +25,13 @@ where
     F: Fn(RawObjectData) -> Result<Box<dyn Object>, ObjectError>,
 {
     /// Creates a new object factory
-    pub fn new(creator: F) -> Self {
-        Self { creator }
+    pub fn new(type_name: &'static str, creator: F) -> Self {
+        Self { type_name, creator }
+    }
+
+    /// Get the type name
+    pub fn type_name(&self) -> &'static str {
+        self.type_name
     }
 
     /// Creates an object

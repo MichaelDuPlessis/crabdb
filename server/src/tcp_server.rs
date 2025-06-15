@@ -1,7 +1,7 @@
 //! Implements the Server trait over tcp
 
 use crate::RecieveError;
-use crab_core::{Deserialize, Key, Object, Serialize, slice_to_array};
+use crab_core::{Object, extract_key, slice_to_array};
 use logging::{debug, info, trace};
 use std::{
     io::{Read, Write},
@@ -102,7 +102,7 @@ impl TryFrom<&[u8]> for crate::Request {
             0 => {
                 trace!("Get request recieved");
 
-                let key = match Key::try_from(value) {
+                let (key, value) = match extract_key(value) {
                     Ok(key) => {
                         info!("Recieved key: {key:?}");
                         key
@@ -116,7 +116,7 @@ impl TryFrom<&[u8]> for crate::Request {
             // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the data payload |
             1 => {
                 trace!("Set request recieved");
-                let key = match Key::try_from(value) {
+                let (key, value) = match extract_key(value) {
                     Ok(key) => {
                         info!("Recieved key: {key:?}");
                         key

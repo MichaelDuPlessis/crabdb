@@ -1,9 +1,8 @@
+use logging::trace;
 use std::{
     collections::HashMap,
     sync::{LazyLock, RwLock},
 };
-
-use logging::trace;
 
 pub mod int;
 pub mod null;
@@ -49,37 +48,37 @@ impl Key {
     }
 }
 
-impl TryFrom<&[u8]> for Key {
-    type Error = ObjectError;
+/// Extracts the key from a byte slice and returns what is remaining in the slice
+// TODO: Should this be an associated function
+pub fn extract_key(slice: &[u8]) -> Result<(Key, &[u8]), ObjectError> {
+    trace!("Deserializing key");
 
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        trace!("Deserializing key");
-
-        // first check if the size is large enough
-        if value.len() < KEY_LEN_TYPE_NUM_BYTES {
-            return Err(ObjectError::MissingData);
-        }
-
-        // extracting text length
-        let key_len =
-            KeyLenType::from_be_bytes(unsafe { slice_to_array(&value[..KEY_LEN_TYPE_NUM_BYTES]) })
-                as usize;
-        trace!("Key len: {key_len}");
-
-        // making sure there is enough bytes left
-        let value = &value[KEY_LEN_TYPE_NUM_BYTES..];
-
-        if value.len() < key_len {
-            return Err(ObjectError::MissingData);
-        }
-
-        // try and convert byte slice to string
-        let key = str::from_utf8(&value[..key_len])
-            .map_err(|_| ObjectError::MalformedData)?
-            .to_owned();
-
-        Ok(Key::new(key))
+    // first check if the size is large enough
+    if slice.len() < KEY_LEN_TYPE_NUM_BYTES {
+        return Err(ObjectError::MissingData);
     }
+
+    // extracting text length
+    let key_len =
+        KeyLenType::from_be_bytes(unsafe { slice_to_array(&slice[..KEY_LEN_TYPE_NUM_BYTES]) })
+            as usize;
+    trace!("Key len: {key_len}");
+
+    // making sure there is enough bytes left
+    let slice = &slice[KEY_LEN_TYPE_NUM_BYTES..];
+
+    if slice.len() < key_len {
+        return Err(ObjectError::MissingData);
+    }
+
+    // try and convert byte slice to string
+    let key = str::from_utf8(&slice[..key_len])
+        .map_err(|_| ObjectError::MalformedData)?
+        .to_owned();
+
+    trace!("Extracted key: {key}");
+
+    Ok((Key::new(key), &slice[key_len..]))
 }
 
 /// Anything that implements object is valid to store and retrieve from the database
@@ -127,13 +126,13 @@ impl ObjectData {
 
         Ok(Self {
             type_id,
-            data: bytes[OBJECT_TYPE_NUM_BYTES..].into(),
+            data: RawObjectData::new(&bytes[OBJECT_TYPE_NUM_BYTES..]),
         })
     }
 
     /// Returns a byte slice of the data that can be used to create objects
-    pub fn data(&self) -> &[u8] {
-        &self.data
+    pub fn data(self) -> RawObjectData {
+        self.data
     }
 
     /// Extract the type id from the data
@@ -161,7 +160,7 @@ where
     }
 
     /// Creates an object
-    pub fn create(&self, data: &[u8]) -> Result<Box<dyn Object>, ObjectError> {
+    pub fn create(&self, data: RawObjectData) -> Result<Box<dyn Object>, ObjectError> {
         (self.creator)(data)
     }
 }

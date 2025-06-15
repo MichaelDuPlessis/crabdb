@@ -42,3 +42,11 @@ impl TryFrom<RawObjectData> for Int {
         }
     }
 }
+
+impl TryFrom<RawObjectData> for Box<Int> {
+    type Error = ObjectError;
+
+    fn try_from(value: RawObjectData) -> Result<Self, Self::Error> {
+        Int::try_from(value).map(|int| Box::new(int))
+    }
+}

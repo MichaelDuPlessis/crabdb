@@ -62,8 +62,8 @@ fn main() {
 
     // registring types
     register_factory(0, |_| Null);
-    register_factory(1, Int::deserialize);
-    register_factory(2, Text::deserialize);
+    register_factory(1, Int::try_from);
+    register_factory(2, Text::try_from);
 
     let server = TcpServer::default();
     let storage = InMemoryStore::default();

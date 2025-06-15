@@ -55,6 +55,14 @@ impl TryFrom<RawObjectData> for Text {
             .to_owned();
 
         trace!("Text {text}");
-        Ok(Box::new(Text::new(text)))
+        Ok(Text::new(text))
+    }
+}
+
+impl TryFrom<RawObjectData> for Box<Text> {
+    type Error = ObjectError;
+
+    fn try_from(value: RawObjectData) -> Result<Self, Self::Error> {
+        Text::try_from(value).map(|text| Box::new(text))
     }
 }

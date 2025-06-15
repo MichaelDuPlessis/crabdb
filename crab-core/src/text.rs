@@ -7,7 +7,7 @@ type TextLenType = u16;
 const TEXT_LEN_TYPE_NUM_BYTES: usize = std::mem::size_of::<TextLenType>();
 
 /// The Text data type. It is internally reprsented as an String.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Text(String);
 
 impl Text {

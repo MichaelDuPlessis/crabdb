@@ -4,7 +4,7 @@ use logging::debug;
 /// The number type to use of the Int data object
 type IntType = isize;
 /// The Int data type. It is internally reprsented as an isize.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Int(IntType);
 
 impl Int {

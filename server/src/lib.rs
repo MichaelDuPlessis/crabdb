@@ -1,6 +1,9 @@
 //! This module is responsible for handling recieving of requests and the sending respones
 
-use crab_core::{DbObject, Key, Object, ObjectData};
+use crab_core::{
+    Key,
+    object::{DbObject, ObjectData},
+};
 
 pub mod tcp_server;
 

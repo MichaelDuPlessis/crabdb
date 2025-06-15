@@ -1,5 +1,7 @@
 use crate::{
-    DbObject, Object, ObjectData, ObjectError, ObjectType, RawObjectData, types::null::Null,
+    ObjectError,
+    object::{DbObject, Object, ObjectData, ObjectType, RawObjectData},
+    types::null::Null,
 };
 use std::{
     collections::HashMap,
@@ -78,7 +80,8 @@ pub fn new_db_object(object_data: ObjectData) -> Result<DbObject, ObjectError> {
     // getting the factory
     let registry = REGISTRY.read().unwrap();
 
-    let ObjectData { type_id, data } = object_data;
+    let type_id = object_data.type_id();
+    let data = object_data.data();
 
     let Some(factory) = registry.get_factory(type_id) else {
         return Err(ObjectError::MissingFactory);

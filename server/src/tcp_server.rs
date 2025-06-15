@@ -1,7 +1,7 @@
 //! Implements the Server trait over tcp
 
 use crate::RecieveError;
-use crab_core::{Object, ObjectData, extract_key, slice_to_array};
+use crab_core::{extract_key, object::ObjectData, slice_to_array};
 use logging::{debug, info, trace};
 use std::{
     io::{Read, Write},

@@ -1,4 +1,4 @@
-use crab_core::{DbObject, Key};
+use crab_core::{Key, object::DbObject};
 use std::borrow::Borrow;
 
 pub mod in_memory_store;

@@ -1,6 +1,6 @@
 use crab_core::{
-    Object,
     factory::{ObjectFactory, new_db_object, register_factory},
+    object::Object,
     types::{int::Int, null::Null, text::Text},
 };
 use logging::{debug, error, init_logger};

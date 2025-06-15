@@ -1,4 +1,8 @@
-use crate::{Object, ObjectError, RawObjectData, slice_to_array};
+use crate::{
+    ObjectError,
+    object::{Object, RawObjectData},
+    slice_to_array,
+};
 use logging::debug;
 
 /// The number type to use of the Int data object

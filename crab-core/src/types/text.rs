@@ -1,4 +1,8 @@
-use crate::{Object, ObjectError, RawObjectData, slice_to_array};
+use crate::{
+    ObjectError,
+    object::{Object, RawObjectData},
+    slice_to_array,
+};
 use logging::trace;
 
 /// The number type that is used to determine the length of the text data type

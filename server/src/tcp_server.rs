@@ -1,7 +1,7 @@
 //! Implements the Server trait over tcp
 
 use crate::RecieveError;
-use crab_core::{Deserialize, Key, Object, Serialize, slice_to_array};
+use crab_core::{extract_key, object::ObjectData, slice_to_array};
 use logging::{debug, info, trace};
 use std::{
     io::{Read, Write},
@@ -75,9 +75,7 @@ impl crate::Connection for TcpStream {
     }
 
     fn send(&mut self, response: crate::Response) -> Result<(), crate::ResponseError> {
-        let response = response
-            .serialize()
-            .map_err(|_| crate::ResponseError::ResponseFailed)?;
+        let response: Vec<_> = response.into();
 
         self.write_all(&response)
             .map_err(|_| crate::ResponseError::ResponseFailed)
@@ -102,8 +100,8 @@ impl TryFrom<&[u8]> for crate::Request {
             0 => {
                 trace!("Get request recieved");
 
-                let key = match Key::deserialize(value) {
-                    Ok((key, _)) => {
+                let (key, value) = match extract_key(value) {
+                    Ok(key) => {
                         info!("Recieved key: {key:?}");
                         key
                     }
@@ -116,16 +114,18 @@ impl TryFrom<&[u8]> for crate::Request {
             // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the data payload |
             1 => {
                 trace!("Set request recieved");
-                let (key, value) = match Key::deserialize(value) {
-                    Ok((key, value)) => {
+                let (key, value) = match extract_key(value) {
+                    Ok(key) => {
                         info!("Recieved key: {key:?}");
-                        (key, value)
+                        key
                     }
                     Err(_) => return Err(RecieveError::InvalidKey),
                 };
 
-                let (object, _) =
-                    Object::deserialize(value).map_err(|_| RecieveError::InvalidObject)?;
+                // Creating Object Data
+                let object =
+                    ObjectData::from_bytes(value).map_err(|_| RecieveError::InvalidObject)?;
+
                 info!("Recieved object: {object:?}");
 
                 Ok(crate::Request::Set(key, object))
@@ -135,26 +135,27 @@ impl TryFrom<&[u8]> for crate::Request {
     }
 }
 
-// structure for a response over tcp is
 // | 8 bytes request length not including the first 8 bytes | 1 byte data type | rest is the data returend |
-impl Serialize<Vec<u8>> for crate::Response {
-    fn serialize(self) -> Result<Vec<u8>, crab_core::SerializeError> {
-        match self {
-            crate::Response::Payload(object) => Ok({
-                let object = object.serialize()?;
-                let mut res = object.len().to_be_bytes().to_vec();
+impl From<crate::Response> for Vec<u8> {
+    fn from(value: crate::Response) -> Self {
+        match value {
+            crate::Response::Payload(db_object) => {
+                let object = db_object.to_bytes();
+
+                let mut res = Vec::with_capacity(DATA_LEN_NUM_BYTES + object.len());
+                res.extend((object.len() as DataLenType).to_be_bytes());
                 res.extend(object);
+
                 res
-            }),
-            // Returning error
-            crate::Response::Error => Ok({
+            }
+            crate::Response::Error => {
                 let data_len = (1 as DataLenType).to_be_bytes();
                 let mut res = [0; 9];
 
                 res[..DATA_LEN_NUM_BYTES].copy_from_slice(&data_len);
                 res[DATA_LEN_NUM_BYTES] = 255;
                 res.to_vec()
-            }),
+            }
         }
     }
 }

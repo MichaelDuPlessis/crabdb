@@ -1,6 +1,11 @@
+use crab_core::{
+    factory::{ObjectFactory, new_db_object, register_factory},
+    object::Object,
+    types::{int::Int, null::Null, text::Text},
+};
 use logging::{debug, error, init_logger};
 use server::{Connection, Response, Server, tcp_server::TcpServer};
-use storage::{Storage, in_memory_store::InMemoryStore};
+use storage::{Storage, StorageError, in_memory_store::InMemoryStore};
 
 /// The engine of the database. It controls all the logic
 struct Engine<S: Server, D: Storage> {
@@ -37,7 +42,15 @@ impl<S: Server, D: Storage> Engine<S, D> {
                 debug!("Sending response");
                 let response = match request {
                     server::Request::Get(key) => self.storage.get(key),
-                    server::Request::Set(key, object) => self.storage.set(key, object),
+                    server::Request::Set(key, object) => {
+                        if let Ok(object) = new_db_object(object) {
+                            self.storage
+                                .set(key, object)
+                                .map_err(|_| StorageError::SetFailed)
+                        } else {
+                            Err(StorageError::SetFailed)
+                        }
+                    }
                     server::Request::Terminated => break,
                 };
 
@@ -58,6 +71,20 @@ impl<S: Server, D: Storage> Engine<S, D> {
 fn main() {
     // intializig logger
     init_logger(logging::LogLevel::Trace);
+
+    // registring types
+    register_factory(
+        0,
+        ObjectFactory::new("null", Box::new(|_| Ok(Box::new(Null) as Box<dyn Object>))),
+    );
+    register_factory(
+        1,
+        ObjectFactory::new("int", Box::new(Int::from_raw_object_data)),
+    );
+    register_factory(
+        2,
+        ObjectFactory::new("text", Box::new(Text::from_raw_object_data)),
+    );
 
     let server = TcpServer::default();
     let storage = InMemoryStore::default();

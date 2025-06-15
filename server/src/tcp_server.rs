@@ -135,6 +135,12 @@ impl TryFrom<&[u8]> for crate::Request {
     }
 }
 
+impl From<crate::Response> for Vec<u8> {
+    fn from(value: crate::Response) -> Self {
+        todo!()
+    }
+}
+
 // structure for a response over tcp is
 // | 8 bytes request length not including the first 8 bytes | 1 byte data type | rest is the data returend |
 impl Serialize<Vec<u8>> for crate::Response {

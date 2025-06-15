@@ -24,6 +24,10 @@ impl Object for Int {
     fn boxed_clone(&self) -> Box<dyn Object> {
         Box::new(self.clone())
     }
+
+    fn into_raw_object_data(self) -> RawObjectData {
+        RawObjectData::new(self.0.to_be_bytes())
+    }
 }
 
 impl TryFrom<RawObjectData> for Int {

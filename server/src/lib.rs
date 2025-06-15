@@ -1,6 +1,6 @@
 //! This module is responsible for handling recieving of requests and the sending respones
 
-use crab_core::{Key, Object};
+use crab_core::{DbObject, Key, Object};
 
 pub mod tcp_server;
 
@@ -45,7 +45,7 @@ pub enum ResponseError {
 #[derive(Debug)]
 pub enum Response {
     /// The request was successful and there is a payload
-    Payload(Box<dyn Object>),
+    Payload(DbObject),
     /// There was an error with the request
     Error,
 }

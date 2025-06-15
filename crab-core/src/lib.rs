@@ -85,6 +85,9 @@ pub fn extract_key(slice: &[u8]) -> Result<(Key, &[u8]), ObjectError> {
 pub trait Object: std::fmt::Debug {
     /// Creates a copy of a boxed object
     fn boxed_clone(&self) -> Box<dyn Object>;
+
+    /// Convert the Object to the objects raw data
+    fn into_raw_object_data(self) -> RawObjectData;
 }
 
 impl Clone for Box<dyn Object> {
@@ -93,14 +96,23 @@ impl Clone for Box<dyn Object> {
     }
 }
 
-/// This is an item that is stored in the db
-pub struct DbItem {
+/// This is an object that is stored in the db
+pub struct DbObject {
+    type_id: ObjectType,
     object: Box<dyn Object>,
 }
 
-impl Clone for DbItem {
+impl DbObject {
+    /// Creates a new DbObject
+    pub fn new(type_id: ObjectType, object: Box<dyn Object>) -> Self {
+        Self { type_id, object }
+    }
+}
+
+impl Clone for DbObject {
     fn clone(&self) -> Self {
         Self {
+            type_id: self.type_id,
             object: self.object.boxed_clone(),
         }
     }
@@ -231,12 +243,17 @@ pub fn register_factory(type_id: ObjectType, factory: TypeRegistryFactoryType) {
 }
 
 /// Creates a new object and derives the type id from the input data
-pub fn new_object(object_data: ObjectData) -> Result<Box<dyn Object>, ObjectError> {
+pub fn new_db_object(object_data: ObjectData) -> Result<DbObject, ObjectError> {
     // getting the factory
     let registry = REGISTRY.read().unwrap();
-    let Some(factory) = registry.get_factory(object_data.type_id) else {
+
+    let ObjectData { type_id, data } = object_data;
+
+    let Some(factory) = registry.get_factory(type_id) else {
         return Err(ObjectError::MissingFactory);
     };
 
-    factory.create(object_data.data())
+    let object = factory.create(data)?;
+
+    Ok(DbObject::new(type_id, object))
 }

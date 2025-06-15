@@ -27,6 +27,14 @@ impl Object for Text {
     fn boxed_clone(&self) -> Box<dyn Object> {
         Box::new(self.clone())
     }
+
+    fn into_raw_object_data(self) -> RawObjectData {
+        let mut text = Vec::with_capacity(self.0.len() + TEXT_LEN_TYPE_NUM_BYTES);
+        text.extend_from_slice(&(self.0.len() as TextLenType).to_be_bytes());
+        text.extend_from_slice(&self.0.as_bytes());
+
+        RawObjectData::new(text)
+    }
 }
 
 impl TryFrom<RawObjectData> for Text {

@@ -1,5 +1,5 @@
 use crate::Storage;
-use crab_core::{DbObject, Key, new_null_db_object};
+use crab_core::{DbObject, Key, factory::new_null_db_object};
 use std::{borrow::Borrow, collections::HashMap};
 
 /// A storage medium that exists only in memory and does not persist data

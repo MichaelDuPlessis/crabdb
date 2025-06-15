@@ -1,5 +1,7 @@
 use crab_core::{
-    Object, ObjectFactory, int::Int, new_db_object, null::Null, register_factory, text::Text,
+    Object,
+    factory::{ObjectFactory, new_db_object, register_factory},
+    types::{int::Int, null::Null, text::Text},
 };
 use logging::{debug, error, init_logger};
 use server::{Connection, Response, Server, tcp_server::TcpServer};

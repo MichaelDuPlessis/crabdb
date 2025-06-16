@@ -1,6 +1,6 @@
 use crate::{
     ObjectError,
-    object::{DbObject, Object, ObjectData, ObjectType, RawObjectData},
+    object::{DbObject, Object, ObjectData, RawObjectData, TypeId},
     types::null::Null,
 };
 use std::{
@@ -46,7 +46,7 @@ type TypeRegistryFactoryType =
 
 /// Responsible for holding and managing mappings of type ids to methods to create the types
 pub struct TypeRegistry {
-    registry: HashMap<ObjectType, TypeRegistryFactoryType>,
+    registry: HashMap<TypeId, TypeRegistryFactoryType>,
 }
 
 impl TypeRegistry {
@@ -58,12 +58,12 @@ impl TypeRegistry {
     }
 
     /// Inserts a factory into the registry with an associated type id
-    pub fn add_factory(&mut self, type_id: ObjectType, factory: TypeRegistryFactoryType) {
+    pub fn add_factory(&mut self, type_id: TypeId, factory: TypeRegistryFactoryType) {
         self.registry.insert(type_id, factory);
     }
 
     /// Gets a ObjectFactory from the registry
-    pub fn get_factory(&self, type_id: ObjectType) -> Option<&TypeRegistryFactoryType> {
+    pub fn get_factory(&self, type_id: TypeId) -> Option<&TypeRegistryFactoryType> {
         self.registry.get(&type_id)
     }
 }
@@ -79,7 +79,7 @@ static REGISTRY: LazyLock<RwLock<TypeRegistry>> =
     LazyLock::new(|| RwLock::new(TypeRegistry::default()));
 
 /// Adds a new ObjectFactory to the type registry
-pub fn register_factory(type_id: ObjectType, factory: TypeRegistryFactoryType) {
+pub fn register_factory(type_id: TypeId, factory: TypeRegistryFactoryType) {
     REGISTRY.write().unwrap().add_factory(type_id, factory);
 }
 

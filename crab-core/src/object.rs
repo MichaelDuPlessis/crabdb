@@ -11,9 +11,9 @@ pub enum ObjectError {
 }
 
 /// The data type of the number used to store the data type
-pub type ObjectType = u8;
+pub type TypeId = u8;
 /// The number of bytes used to represent the data type
-const OBJECT_TYPE_NUM_BYTES: usize = std::mem::size_of::<ObjectType>();
+const TYPE_ID_NUM_BYTES: usize = std::mem::size_of::<TypeId>();
 
 /// Anything that implements object is valid to store and retrieve from the database
 pub trait Object: std::fmt::Debug {
@@ -36,13 +36,13 @@ impl Clone for Box<dyn Object> {
 /// This is an object that is stored in the db
 #[derive(Debug)]
 pub struct DbObject {
-    type_id: ObjectType,
+    type_id: TypeId,
     object: Box<dyn Object>,
 }
 
 impl DbObject {
     /// Creates a new DbObject
-    pub fn new(type_id: ObjectType, object: Box<dyn Object>) -> Self {
+    pub fn new(type_id: TypeId, object: Box<dyn Object>) -> Self {
         Self { type_id, object }
     }
 
@@ -50,7 +50,7 @@ impl DbObject {
     pub fn to_bytes(&self) -> Vec<u8> {
         let raw_data = self.object.into_raw_object_data();
         let raw_data = raw_data.as_ref();
-        let mut data = Vec::with_capacity(OBJECT_TYPE_NUM_BYTES + raw_data.len());
+        let mut data = Vec::with_capacity(TYPE_ID_NUM_BYTES + raw_data.len());
 
         data.extend(self.type_id.to_be_bytes());
         data.extend(raw_data);
@@ -93,7 +93,7 @@ impl AsRef<[u8]> for RawObjectData {
 /// Data that can be used to create an object
 #[derive(Debug)]
 pub struct ObjectData {
-    type_id: ObjectType,
+    type_id: TypeId,
     data: RawObjectData,
 }
 
@@ -103,16 +103,15 @@ impl ObjectData {
     /// This byte data should include the type id
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, ObjectError> {
         // checking if there are enough bytes for the type id
-        if bytes.len() < OBJECT_TYPE_NUM_BYTES {
+        if bytes.len() < TYPE_ID_NUM_BYTES {
             return Err(ObjectError::MissingData);
         }
 
-        let type_id =
-            ObjectType::from_be_bytes(unsafe { slice_to_array(&bytes[..OBJECT_TYPE_NUM_BYTES]) });
+        let type_id = TypeId::from_be_bytes(unsafe { slice_to_array(&bytes[..TYPE_ID_NUM_BYTES]) });
 
         Ok(Self {
             type_id,
-            data: RawObjectData::new(&bytes[OBJECT_TYPE_NUM_BYTES..]),
+            data: RawObjectData::new(&bytes[TYPE_ID_NUM_BYTES..]),
         })
     }
 
@@ -122,14 +121,14 @@ impl ObjectData {
     }
 
     /// Extract the type id from the data
-    pub fn type_id(&self) -> ObjectType {
+    pub fn type_id(&self) -> TypeId {
         self.type_id
     }
 
     /// Convert the object data to raw bytes
     pub fn to_bytes(&self) -> Vec<u8> {
         let raw_data = self.data.as_ref();
-        let mut data = Vec::with_capacity(OBJECT_TYPE_NUM_BYTES + raw_data.len());
+        let mut data = Vec::with_capacity(TYPE_ID_NUM_BYTES + raw_data.len());
 
         data.extend(self.type_id.to_be_bytes());
         data.extend(raw_data);

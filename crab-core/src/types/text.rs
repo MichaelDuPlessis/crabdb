@@ -1,8 +1,4 @@
-use crate::{
-    ObjectError,
-    object::{Object, RawObjectData},
-    slice_to_array,
-};
+use crate::{ObjectError, object::Object, slice_to_array};
 use logging::trace;
 
 /// The number type that is used to determine the length of the text data type
@@ -22,8 +18,8 @@ impl Text {
 
     /// Creates a Boxe dyn Object from RawObject data
     pub fn from_raw_object_data(
-        object_data: RawObjectData,
-    ) -> Result<Box<dyn Object>, <Self as TryFrom<RawObjectData>>::Error> {
+        object_data: Vec<u8>,
+    ) -> Result<Box<dyn Object>, <Self as TryFrom<Vec<u8>>>::Error> {
         Box::<Self>::try_from(object_data).map(|object| object as Box<dyn Object>)
     }
 }
@@ -39,12 +35,12 @@ impl Object for Text {
         Box::new(self.clone())
     }
 
-    fn into_raw_object_data(&self) -> RawObjectData {
+    fn into_raw(&self) -> Vec<u8> {
         let mut text = Vec::with_capacity(self.0.len() + TEXT_LEN_TYPE_NUM_BYTES);
         text.extend_from_slice(&(self.0.len() as TextLenType).to_be_bytes());
         text.extend_from_slice(&self.0.as_bytes());
 
-        RawObjectData::new(text)
+        text
     }
 
     fn type_name(&self) -> &'static str {
@@ -52,12 +48,10 @@ impl Object for Text {
     }
 }
 
-impl TryFrom<RawObjectData> for Text {
+impl TryFrom<Vec<u8>> for Text {
     type Error = ObjectError;
 
-    fn try_from(value: RawObjectData) -> Result<Self, Self::Error> {
-        let value = value.as_ref();
-
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         // making sure there is enough data
         if value.len() < TEXT_LEN_TYPE_NUM_BYTES {
             return Err(ObjectError::MissingData);
@@ -86,10 +80,10 @@ impl TryFrom<RawObjectData> for Text {
     }
 }
 
-impl TryFrom<RawObjectData> for Box<Text> {
+impl TryFrom<Vec<u8>> for Box<Text> {
     type Error = ObjectError;
 
-    fn try_from(value: RawObjectData) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         Text::try_from(value).map(|text| Box::new(text))
     }
 }

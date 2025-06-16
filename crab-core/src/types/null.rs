@@ -1,4 +1,4 @@
-use crate::object::{Object, RawObjectData};
+use crate::object::Object;
 
 /// This struct represents nothing as in the absence of a value
 #[derive(Debug, Clone)]
@@ -9,8 +9,8 @@ impl Object for Null {
         Box::new(self.clone())
     }
 
-    fn into_raw_object_data(&self) -> RawObjectData {
-        RawObjectData::new([])
+    fn into_raw(&self) -> Vec<u8> {
+        Vec::with_capacity(0)
     }
 
     fn type_name(&self) -> &'static str {

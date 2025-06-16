@@ -1,6 +1,6 @@
 use crate::{
     ObjectError,
-    object::{DbObject, Object, ObjectData, RawObjectData, TypeId},
+    object::{DbObject, Object, ObjectData, TypeId},
     types::null::Null,
 };
 use std::{
@@ -12,7 +12,7 @@ use std::{
 #[derive(Debug)]
 pub struct ObjectFactory<F>
 where
-    F: Fn(RawObjectData) -> Result<Box<dyn Object>, ObjectError>,
+    F: Fn(Vec<u8>) -> Result<Box<dyn Object>, ObjectError>,
 {
     /// The name of the data type that the factory makes
     type_name: &'static str,
@@ -22,7 +22,7 @@ where
 
 impl<F> ObjectFactory<F>
 where
-    F: Fn(RawObjectData) -> Result<Box<dyn Object>, ObjectError>,
+    F: Fn(Vec<u8>) -> Result<Box<dyn Object>, ObjectError>,
 {
     /// Creates a new object factory
     pub fn new(type_name: &'static str, creator: F) -> Self {
@@ -35,14 +35,14 @@ where
     }
 
     /// Creates an object
-    pub fn create(&self, data: RawObjectData) -> Result<Box<dyn Object>, ObjectError> {
+    pub fn create(&self, data: Vec<u8>) -> Result<Box<dyn Object>, ObjectError> {
         (self.creator)(data)
     }
 }
 
 /// Just shortand for the ObjectFactory that the TypeRegistry uses
 type TypeRegistryFactoryType =
-    ObjectFactory<Box<dyn Fn(RawObjectData) -> Result<Box<dyn Object>, ObjectError> + Sync + Send>>;
+    ObjectFactory<Box<dyn Fn(Vec<u8>) -> Result<Box<dyn Object>, ObjectError> + Sync + Send>>;
 
 /// Responsible for holding and managing mappings of type ids to methods to create the types
 pub struct TypeRegistry {

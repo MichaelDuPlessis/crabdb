@@ -21,7 +21,7 @@ pub trait Object: std::fmt::Debug {
     fn boxed_clone(&self) -> Box<dyn Object>;
 
     /// Convert the Object to the objects raw data
-    fn into_raw_object_data(&self) -> RawObjectData;
+    fn into_raw(&self) -> Vec<u8>;
 
     /// Return the type_name for the object
     fn type_name(&self) -> &'static str;
@@ -48,8 +48,7 @@ impl DbObject {
 
     /// Convert the object data to raw bytes
     pub fn to_bytes(&self) -> Vec<u8> {
-        let raw_data = self.object.into_raw_object_data();
-        let raw_data = raw_data.as_ref();
+        let raw_data = self.object.into_raw();
         let mut data = Vec::with_capacity(TYPE_ID_NUM_BYTES + raw_data.len());
 
         data.extend(self.type_id.to_be_bytes());
@@ -68,33 +67,11 @@ impl Clone for DbObject {
     }
 }
 
-/// The raw bytes that an object can be built from
-#[derive(Debug)]
-pub struct RawObjectData {
-    raw_data: Vec<u8>,
-}
-
-impl RawObjectData {
-    /// Creates a new RawObjectData from a byte slice
-    /// No error checking is performed
-    pub fn new(data: impl Into<Vec<u8>>) -> Self {
-        Self {
-            raw_data: data.into(),
-        }
-    }
-}
-
-impl AsRef<[u8]> for RawObjectData {
-    fn as_ref(&self) -> &[u8] {
-        &self.raw_data
-    }
-}
-
 /// Data that can be used to create an object
 #[derive(Debug)]
 pub struct ObjectData {
     type_id: TypeId,
-    data: RawObjectData,
+    data: Vec<u8>,
 }
 
 impl ObjectData {
@@ -111,12 +88,12 @@ impl ObjectData {
 
         Ok(Self {
             type_id,
-            data: RawObjectData::new(&bytes[TYPE_ID_NUM_BYTES..]),
+            data: bytes[TYPE_ID_NUM_BYTES..].into(),
         })
     }
 
     /// Returns a byte slice of the data that can be used to create objects
-    pub fn data(self) -> RawObjectData {
+    pub fn data(self) -> Vec<u8> {
         self.data
     }
 
@@ -127,7 +104,7 @@ impl ObjectData {
 
     /// Convert the object data to raw bytes
     pub fn to_bytes(&self) -> Vec<u8> {
-        let raw_data = self.data.as_ref();
+        let raw_data = &self.data;
         let mut data = Vec::with_capacity(TYPE_ID_NUM_BYTES + raw_data.len());
 
         data.extend(self.type_id.to_be_bytes());
@@ -143,7 +120,7 @@ impl From<DbObject> for ObjectData {
 
         Self {
             type_id: value.type_id,
-            data: object.into_raw_object_data(),
+            data: object.into_raw(),
         }
     }
 }

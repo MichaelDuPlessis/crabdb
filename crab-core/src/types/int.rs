@@ -1,8 +1,4 @@
-use crate::{
-    ObjectError,
-    object::{Object, RawObjectData},
-    slice_to_array,
-};
+use crate::{ObjectError, object::Object, slice_to_array};
 use logging::debug;
 
 /// The number type to use of the Int data object
@@ -19,8 +15,8 @@ impl Int {
 
     /// Creates a Boxe dyn Object from RawObject data
     pub fn from_raw_object_data(
-        object_data: RawObjectData,
-    ) -> Result<Box<dyn Object>, <Self as TryFrom<RawObjectData>>::Error> {
+        object_data: Vec<u8>,
+    ) -> Result<Box<dyn Object>, <Self as TryFrom<Vec<u8>>>::Error> {
         Box::<Self>::try_from(object_data).map(|object| object as Box<dyn Object>)
     }
 }
@@ -36,8 +32,8 @@ impl Object for Int {
         Box::new(self.clone())
     }
 
-    fn into_raw_object_data(&self) -> RawObjectData {
-        RawObjectData::new(self.0.to_be_bytes())
+    fn into_raw(&self) -> Vec<u8> {
+        self.0.to_be_bytes().into()
     }
 
     fn type_name(&self) -> &'static str {
@@ -45,12 +41,10 @@ impl Object for Int {
     }
 }
 
-impl TryFrom<RawObjectData> for Int {
+impl TryFrom<Vec<u8>> for Int {
     type Error = ObjectError;
 
-    fn try_from(value: RawObjectData) -> Result<Self, Self::Error> {
-        let value = value.as_ref();
-
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         // making sure there is exactly the correct amount of data
         if value.len() < std::mem::size_of::<IntType>() {
             debug!(
@@ -66,10 +60,10 @@ impl TryFrom<RawObjectData> for Int {
     }
 }
 
-impl TryFrom<RawObjectData> for Box<Int> {
+impl TryFrom<Vec<u8>> for Box<Int> {
     type Error = ObjectError;
 
-    fn try_from(value: RawObjectData) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         Int::try_from(value).map(|int| Box::new(int))
     }
 }

@@ -55,7 +55,7 @@ pub enum Response {
 
 /// All methods that a Server must implement to be usable
 pub trait Server {
-    type Handler: Connection;
+    type Handler: Connection + Send;
 
     /// The request just needs to be able to listen for connections
     /// it is then responsible for processing the requests and returning a response

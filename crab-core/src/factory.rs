@@ -12,7 +12,7 @@ use std::{
 #[derive(Debug)]
 pub struct ObjectFactory<F>
 where
-    F: Fn(Vec<u8>) -> Result<Box<dyn Object>, ObjectError>,
+    F: Fn(Vec<u8>) -> Result<Box<dyn Object + Send + Sync>, ObjectError>,
 {
     /// The name of the data type that the factory makes
     type_name: &'static str,
@@ -22,7 +22,7 @@ where
 
 impl<F> ObjectFactory<F>
 where
-    F: Fn(Vec<u8>) -> Result<Box<dyn Object>, ObjectError>,
+    F: Fn(Vec<u8>) -> Result<Box<dyn Object + Send + Sync>, ObjectError>,
 {
     /// Creates a new object factory
     pub fn new(type_name: &'static str, creator: F) -> Self {
@@ -35,14 +35,15 @@ where
     }
 
     /// Creates an object
-    pub fn create(&self, data: Vec<u8>) -> Result<Box<dyn Object>, ObjectError> {
+    pub fn create(&self, data: Vec<u8>) -> Result<Box<dyn Object + Send + Sync>, ObjectError> {
         (self.creator)(data)
     }
 }
 
 /// Just shortand for the ObjectFactory that the TypeRegistry uses
-type TypeRegistryFactoryType =
-    ObjectFactory<Box<dyn Fn(Vec<u8>) -> Result<Box<dyn Object>, ObjectError> + Sync + Send>>;
+type TypeRegistryFactoryType = ObjectFactory<
+    Box<dyn Fn(Vec<u8>) -> Result<Box<dyn Object + Send + Sync>, ObjectError> + Sync + Send>,
+>;
 
 /// Responsible for holding and managing mappings of type ids to methods to create the types
 pub struct TypeRegistry {
@@ -79,6 +80,7 @@ static REGISTRY: LazyLock<RwLock<TypeRegistry>> =
     LazyLock::new(|| RwLock::new(TypeRegistry::default()));
 
 /// Adds a new ObjectFactory to the type registry
+/// It is assumed the the type with TypeId 0 is the null type
 pub fn register_factory(type_id: TypeId, factory: TypeRegistryFactoryType) {
     REGISTRY.write().unwrap().add_factory(type_id, factory);
 }

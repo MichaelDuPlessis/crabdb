@@ -18,7 +18,7 @@ const TYPE_ID_NUM_BYTES: usize = std::mem::size_of::<TypeId>();
 /// Anything that implements object is valid to store and retrieve from the database
 pub trait Object: std::fmt::Debug {
     /// Creates a copy of a boxed object
-    fn boxed_clone(&self) -> Box<dyn Object>;
+    fn boxed_clone(&self) -> Box<dyn Object + Send + Sync>;
 
     /// Convert the Object to the objects raw data
     fn into_raw(&self) -> Vec<u8>;
@@ -27,7 +27,7 @@ pub trait Object: std::fmt::Debug {
     fn type_name(&self) -> &'static str;
 }
 
-impl Clone for Box<dyn Object> {
+impl Clone for Box<dyn Object + Send + Sync> {
     fn clone(&self) -> Self {
         self.boxed_clone()
     }
@@ -37,12 +37,12 @@ impl Clone for Box<dyn Object> {
 #[derive(Debug)]
 pub struct DbObject {
     type_id: TypeId,
-    object: Box<dyn Object>,
+    object: Box<dyn Object + Send + Sync>,
 }
 
 impl DbObject {
     /// Creates a new DbObject
-    pub fn new(type_id: TypeId, object: Box<dyn Object>) -> Self {
+    pub fn new(type_id: TypeId, object: Box<dyn Object + Send + Sync>) -> Self {
         Self { type_id, object }
     }
 

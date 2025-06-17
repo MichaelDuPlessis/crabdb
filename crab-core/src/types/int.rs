@@ -16,8 +16,8 @@ impl Int {
     /// Creates a Boxe dyn Object from RawObject data
     pub fn from_raw_object_data(
         object_data: Vec<u8>,
-    ) -> Result<Box<dyn Object>, <Self as TryFrom<Vec<u8>>>::Error> {
-        Box::<Self>::try_from(object_data).map(|object| object as Box<dyn Object>)
+    ) -> Result<Box<dyn Object + Send + Sync>, <Self as TryFrom<Vec<u8>>>::Error> {
+        Box::<Self>::try_from(object_data).map(|object| object as Box<dyn Object + Send + Sync>)
     }
 }
 
@@ -28,7 +28,7 @@ impl From<isize> for Int {
 }
 
 impl Object for Int {
-    fn boxed_clone(&self) -> Box<dyn Object> {
+    fn boxed_clone(&self) -> Box<dyn Object + Send + Sync> {
         Box::new(self.clone())
     }
 

@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 crab-core = { path = "../crab-core" }
+concurrent-map = { path = "../concurrent-map" }

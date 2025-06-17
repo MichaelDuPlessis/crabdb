@@ -54,7 +54,7 @@ where
 
     /// Inserts a new element into the ConcurrentMap
     /// and returns the element was already there if one exists
-    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+    pub fn insert(&self, key: K, value: V) -> Option<V> {
         // getting the shard
         let shard = self.shard(&key);
         // inserting the value
@@ -77,7 +77,7 @@ where
     }
 
     /// Removes an element from the ConcurrentMap. Returns None if the element does not exist
-    pub fn remove(&mut self, key: &K) -> Option<V> {
+    pub fn remove(&self, key: &K) -> Option<V> {
         // getting the shard
         let shard = self.shard(&key);
         // inserting the value

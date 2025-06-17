@@ -5,7 +5,7 @@ use crate::object::Object;
 pub struct Null;
 
 impl Object for Null {
-    fn boxed_clone(&self) -> Box<dyn Object> {
+    fn boxed_clone(&self) -> Box<dyn Object + Send + Sync> {
         Box::new(self.clone())
     }
 

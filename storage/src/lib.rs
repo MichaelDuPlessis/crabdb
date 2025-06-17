@@ -15,11 +15,11 @@ type Result<T> = std::result::Result<T, StorageError>;
 /// A common interface for storing items
 pub trait Storage {
     /// Saves an object in the database under a Key and returns the old object under the key if there is one
-    fn set(&mut self, key: Key, object: DbObject) -> Result<DbObject>;
+    fn set(&self, key: Key, object: DbObject) -> Result<DbObject>;
 
     /// Gets an object saved in the database under a key or none if the key is not found
     fn get(&self, key: impl Borrow<Key>) -> Result<DbObject>;
 
     /// Deletes an object from the database under a key and returns the object or none if the key is not found
-    fn delete(&mut self, key: impl Borrow<Key>) -> Result<DbObject>;
+    fn delete(&self, key: impl Borrow<Key>) -> Result<DbObject>;
 }

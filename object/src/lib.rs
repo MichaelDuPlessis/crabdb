@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 
+pub mod int;
+pub mod null;
+
 /// The value under which an object is stored in the database
 #[derive(Debug)]
 pub struct Key(String);

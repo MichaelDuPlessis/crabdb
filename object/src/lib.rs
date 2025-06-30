@@ -1,5 +1,7 @@
+use core::error;
 use std::{
     collections::HashMap,
+    fmt,
     sync::{LazyLock, RwLock},
 };
 
@@ -14,10 +16,16 @@ pub struct Key(String);
 pub type TypeId = u8;
 
 /// The type of errors that can occur when constructing an object
-pub enum ObjectError {
-    /// The data provided to create the object is invalid
-    BadData,
+#[derive(Debug)]
+pub struct ObjectError;
+
+impl fmt::Display for ObjectError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "the data provided for the Object is invalid")
+    }
 }
+
+impl error::Error for ObjectError {}
 
 /// Defines and object as well as what methods can be performed on it
 pub trait Object: std::fmt::Debug {

@@ -13,6 +13,12 @@ pub struct Key(String);
 /// Used to represent the type of the object
 pub type TypeId = u8;
 
+/// The type of errors that can occur when constructing an object
+pub enum ObjectError {
+    /// The data provided to create the object is invalid
+    BadData,
+}
+
 /// Defines and object as well as what methods can be performed on it
 pub trait Object: std::fmt::Debug {
     /// Returns the TypeId of the object
@@ -20,6 +26,11 @@ pub trait Object: std::fmt::Debug {
 
     /// Turn the object into raw bytes
     fn serialize(self) -> Vec<u8>;
+
+    /// Turn raw bytes into an object
+    fn deserialize(bytes: Vec<u8>) -> Result<DbObject, ObjectError>
+    where
+        Self: Sized;
 }
 
 /// The type of the object used in the database
@@ -112,7 +123,7 @@ pub mod type_registry {
         registry.register_factory(type_id, factory)
     }
 
-    /// Create a new object from a TypeId and raw bytes
+    /// Create a new object from raw bytes the TypeId is extracted from the bytes
     pub fn create_object(type_id: TypeId, bytes: Vec<u8>) -> Result<DbObject, RegistryError> {
         let registry = REGISTRY.read().unwrap();
         registry.create_object(type_id, bytes)

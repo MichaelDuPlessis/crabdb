@@ -1,4 +1,4 @@
-use crate::{Object, TypeId};
+use crate::{DbObject, Object, ObjectError, TypeId};
 
 const TYPE_ID: TypeId = 0;
 
@@ -14,5 +14,12 @@ impl Object for Null {
 
     fn serialize(self) -> Vec<u8> {
         Vec::with_capacity(0)
+    }
+
+    fn deserialize(_: Vec<u8>) -> Result<DbObject, ObjectError>
+    where
+        Self: Sized,
+    {
+        Ok(Box::new(Self))
     }
 }

@@ -1,11 +1,16 @@
-use crate::{Object, TypeId};
+use crate::{DbObject, Object, ObjectError, TypeId};
 
 const TYPE_ID: TypeId = 1;
+
+/// The internal type used to represent an int
+type InternalInt = i64;
+/// The number of bytes needed to represent an InternalInt
+const INTERNAL_INT_SIZE: usize = std::mem::size_of::<InternalInt>();
 
 /// The number data type that is stored in the database
 /// it is backed by a signed 64 bit integer
 #[derive(Debug)]
-pub struct Int(i64);
+pub struct Int(InternalInt);
 
 impl Object for Int {
     fn type_id(&self) -> TypeId {
@@ -14,5 +19,21 @@ impl Object for Int {
 
     fn serialize(self) -> Vec<u8> {
         self.0.to_be_bytes().into()
+    }
+
+    fn deserialize(bytes: Vec<u8>) -> Result<DbObject, ObjectError>
+    where
+        Self: Sized,
+    {
+        // Making sure that bytes is the exact right size for
+        // the underlying type of Int
+        assert_eq!(bytes.len(), INTERNAL_INT_SIZE);
+
+        let mut buffer = [0; INTERNAL_INT_SIZE];
+        buffer.copy_from_slice(&bytes);
+
+        let interal = InternalInt::from_be_bytes(buffer);
+
+        Ok(Box::new(Self(interal)))
     }
 }

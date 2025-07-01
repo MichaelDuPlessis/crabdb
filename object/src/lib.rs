@@ -48,14 +48,14 @@ pub type DbObject = Box<dyn Object + Send + Sync>;
 #[derive(Debug)]
 pub struct ObjectFactory<F>
 where
-    F: Fn(Vec<u8>) -> DbObject,
+    F: Fn(Vec<u8>) -> Result<DbObject, ObjectError>,
 {
     factory_method: F,
 }
 
 impl<F> ObjectFactory<F>
 where
-    F: Fn(Vec<u8>) -> DbObject,
+    F: Fn(Vec<u8>) -> Result<DbObject, ObjectError>,
 {
     /// Creates a new ObjectFactory
     pub fn new(factory_method: F) -> Self {
@@ -63,21 +63,48 @@ where
     }
 
     /// Creates a Box<dyn Object> from some bytes
-    pub fn create_object(&self, bytes: Vec<u8>) -> DbObject {
+    pub fn create_object(&self, bytes: Vec<u8>) -> Result<DbObject, ObjectError> {
         (self.factory_method)(bytes)
     }
 }
 
 /// The kinds of errors that can occur with the registry
+#[derive(Debug)]
 pub enum RegistryError {
     /// The factory for the TypeId specified does not exist
     NoFactory,
     /// The TypeId being registered has already been registered
     AlreadyRegistered,
+    /// The Object failed to create
+    ObjectError,
+}
+
+impl fmt::Display for RegistryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                RegistryError::NoFactory => "no factory found for specified TypeId",
+                RegistryError::AlreadyRegistered =>
+                    "the TypeId specified has already been registered",
+                RegistryError::ObjectError => "the Object failed to create",
+            }
+        )
+    }
+}
+
+impl std::error::Error for RegistryError {}
+
+impl From<ObjectError> for RegistryError {
+    fn from(_: ObjectError) -> Self {
+        Self::ObjectError
+    }
 }
 
 /// The type of the factory used in the Registry
-type RegistryObjectFactory = ObjectFactory<Box<dyn Fn(Vec<u8>) -> DbObject + Send + Sync>>;
+type RegistryObjectFactory =
+    ObjectFactory<Box<dyn Fn(Vec<u8>) -> Result<DbObject, ObjectError> + Send + Sync>>;
 
 /// Contains a mapping of TypeId's to ObjectFactories and is used to ceate Box<dyn Object>'s
 #[derive(Default)]
@@ -107,7 +134,7 @@ impl Registry {
         bytes: Vec<u8>,
     ) -> Result<DbObject, RegistryError> {
         if let Some(factory) = self.factories.get(&type_id) {
-            Ok(factory.create_object(bytes))
+            Ok(factory.create_object(bytes)?)
         } else {
             Err(RegistryError::NoFactory)
         }
@@ -122,7 +149,7 @@ pub mod type_registry {
     use crate::{DbObject, REGISTRY, RegistryError, RegistryObjectFactory, TypeId};
 
     /// Register a new type
-    pub fn register_type(
+    pub fn register_factory(
         type_id: TypeId,
         factory: RegistryObjectFactory,
     ) -> Result<(), RegistryError> {

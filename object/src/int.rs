@@ -21,10 +21,12 @@ impl Object for Int {
         self.0.to_be_bytes().into()
     }
 
-    fn deserialize(bytes: Vec<u8>) -> Result<DbObject, ObjectError>
+    fn deserialize(bytes: impl AsRef<[u8]>) -> Result<DbObject, ObjectError>
     where
         Self: Sized,
     {
+        let bytes = bytes.as_ref();
+
         // Making sure that bytes is the exact right size for
         // the underlying type of Int
         if bytes.len() != INTERNAL_INT_SIZE {

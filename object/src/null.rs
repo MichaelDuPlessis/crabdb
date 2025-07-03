@@ -16,7 +16,7 @@ impl Object for Null {
         Vec::with_capacity(0)
     }
 
-    fn deserialize(_: Vec<u8>) -> Result<DbObject, ObjectError>
+    fn deserialize(_: impl AsRef<[u8]>) -> Result<DbObject, ObjectError>
     where
         Self: Sized,
     {

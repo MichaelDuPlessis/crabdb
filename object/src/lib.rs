@@ -36,7 +36,7 @@ pub trait Object: std::fmt::Debug {
     fn serialize(self) -> Vec<u8>;
 
     /// Turn raw bytes into an object
-    fn deserialize(bytes: Vec<u8>) -> Result<DbObject, ObjectError>
+    fn deserialize(bytes: impl AsRef<[u8]>) -> Result<DbObject, ObjectError>
     where
         Self: Sized;
 }
@@ -48,14 +48,14 @@ pub type DbObject = Box<dyn Object + Send + Sync>;
 #[derive(Debug)]
 pub struct ObjectFactory<F>
 where
-    F: Fn(Vec<u8>) -> Result<DbObject, ObjectError>,
+    F: Fn(&[u8]) -> Result<DbObject, ObjectError>,
 {
     factory_method: F,
 }
 
 impl<F> ObjectFactory<F>
 where
-    F: Fn(Vec<u8>) -> Result<DbObject, ObjectError>,
+    F: Fn(&[u8]) -> Result<DbObject, ObjectError>,
 {
     /// Creates a new ObjectFactory
     pub fn new(factory_method: F) -> Self {
@@ -63,8 +63,8 @@ where
     }
 
     /// Creates a Box<dyn Object> from some bytes
-    pub fn create_object(&self, bytes: Vec<u8>) -> Result<DbObject, ObjectError> {
-        (self.factory_method)(bytes)
+    pub fn create_object(&self, bytes: impl AsRef<[u8]>) -> Result<DbObject, ObjectError> {
+        (self.factory_method)(bytes.as_ref())
     }
 }
 
@@ -104,7 +104,7 @@ impl From<ObjectError> for RegistryError {
 
 /// The type of the factory used in the Registry
 type RegistryObjectFactory =
-    ObjectFactory<Box<dyn Fn(Vec<u8>) -> Result<DbObject, ObjectError> + Send + Sync>>;
+    ObjectFactory<Box<dyn Fn(&[u8]) -> Result<DbObject, ObjectError> + Send + Sync>>;
 
 /// Contains a mapping of TypeId's to ObjectFactories and is used to ceate Box<dyn Object>'s
 #[derive(Default)]
@@ -131,7 +131,7 @@ impl Registry {
     pub fn create_object(
         &self,
         type_id: TypeId,
-        bytes: Vec<u8>,
+        bytes: impl AsRef<[u8]>,
     ) -> Result<DbObject, RegistryError> {
         if let Some(factory) = self.factories.get(&type_id) {
             Ok(factory.create_object(bytes)?)
@@ -159,7 +159,10 @@ pub mod type_registry {
     }
 
     /// Create a new object from raw bytes the TypeId is extracted from the bytes
-    pub fn create_object(type_id: TypeId, bytes: Vec<u8>) -> Result<DbObject, RegistryError> {
+    pub fn create_object(
+        type_id: TypeId,
+        bytes: impl AsRef<[u8]>,
+    ) -> Result<DbObject, RegistryError> {
         let registry = REGISTRY.read().unwrap();
         registry.create_object(type_id, bytes)
     }

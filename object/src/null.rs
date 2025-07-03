@@ -12,7 +12,7 @@ impl Object for Null {
         TYPE_ID
     }
 
-    fn serialize(self) -> Vec<u8> {
+    fn serialize(&self) -> Vec<u8> {
         Vec::with_capacity(0)
     }
 

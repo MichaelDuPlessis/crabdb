@@ -1,7 +1,7 @@
-use object::{Key, ObjectError, type_registry::create_object_from_bytes};
+use object::{DbObject, Key, ObjectError};
 use std::{
     fmt,
-    io::{self, Read},
+    io::{self, Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream},
 };
 
@@ -156,5 +156,10 @@ impl Connection {
         self.stream.read_exact(&mut data)?;
 
         Command::new(command_type, data)
+    }
+
+    /// Sends data back to the client
+    pub fn send(&mut self, object: DbObject) -> Result<(), io::Error> {
+        self.stream.write_all(&object.serialize())
     }
 }

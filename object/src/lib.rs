@@ -65,7 +65,7 @@ pub trait Object: std::fmt::Debug {
     fn type_id(&self) -> TypeId;
 
     /// Turn the object into raw bytes
-    fn serialize(self) -> Vec<u8>;
+    fn serialize(&self) -> Vec<u8>;
 
     /// Turn raw bytes into an object
     fn deserialize(bytes: &[u8]) -> Result<(DbObject, &[u8]), ObjectError>

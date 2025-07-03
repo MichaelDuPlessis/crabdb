@@ -17,7 +17,7 @@ impl Object for Int {
         TYPE_ID
     }
 
-    fn serialize(self) -> Vec<u8> {
+    fn serialize(&self) -> Vec<u8> {
         self.0.to_be_bytes().into()
     }
 

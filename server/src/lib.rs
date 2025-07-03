@@ -1,4 +1,4 @@
-use object::{DbObject, Key, ObjectError};
+use object::{Key, Object, ObjectError};
 use std::{
     fmt,
     io::{self, Read, Write},
@@ -159,7 +159,7 @@ impl Connection {
     }
 
     /// Sends data back to the client
-    pub fn send(&mut self, object: DbObject) -> Result<(), io::Error> {
+    pub fn send(&mut self, object: Object) -> Result<(), io::Error> {
         self.stream.write_all(&object.serialize())
     }
 }

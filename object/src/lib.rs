@@ -58,7 +58,7 @@ impl fmt::Display for ObjectError {
 impl error::Error for ObjectError {}
 
 /// Represents an Object in the database
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Object {
     /// This represents no item
     Null(Null),

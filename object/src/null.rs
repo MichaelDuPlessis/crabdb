@@ -1,7 +1,7 @@
 use crate::ObjectError;
 /// This represents a null object in the database
 /// so just no value
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Null;
 
 impl Null {

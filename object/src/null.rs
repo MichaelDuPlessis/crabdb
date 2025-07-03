@@ -16,10 +16,10 @@ impl Object for Null {
         Vec::with_capacity(0)
     }
 
-    fn deserialize(_: impl AsRef<[u8]>) -> Result<DbObject, ObjectError>
+    fn deserialize(bytes: &[u8]) -> Result<(DbObject, &[u8]), ObjectError>
     where
         Self: Sized,
     {
-        Ok(Box::new(Self))
+        Ok((Box::new(Self), bytes))
     }
 }

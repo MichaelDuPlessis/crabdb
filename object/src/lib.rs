@@ -8,9 +8,23 @@ use std::{
 pub mod int;
 pub mod null;
 
+/// The data type used to store the key length
+type KeyLen = u16;
+/// The number of bytes the key length requires
+const KEY_LEN_NUM_BYTES: usize = std::mem::size_of::<KeyLen>();
+
 /// The value under which an object is stored in the database
 #[derive(Debug)]
 pub struct Key(String);
+
+impl Key {
+    /// Create a new Key from raw bytes
+    /// The bytes provides must have this format:
+    /// | 2 bytes the length of the key (n) | n bytes the key itself |
+    pub fn new(byte: impl AsRef<[u8]>) -> Result<Self, ObjectError> {
+        todo!()
+    }
+}
 
 /// Used to represent the type of the object
 pub type TypeId = u8;
@@ -36,7 +50,7 @@ pub trait Object: std::fmt::Debug {
     fn serialize(self) -> Vec<u8>;
 
     /// Turn raw bytes into an object
-    fn deserialize(bytes: impl AsRef<[u8]>) -> Result<DbObject, ObjectError>
+    fn deserialize(bytes: &[u8]) -> Result<(DbObject, &[u8]), ObjectError>
     where
         Self: Sized;
 }
@@ -128,11 +142,7 @@ impl Registry {
     }
 
     /// Creates an object using the Registry and the associated ObjectFactory if one exists
-    pub fn create_object(
-        &self,
-        type_id: TypeId,
-        bytes: impl AsRef<[u8]>,
-    ) -> Result<DbObject, RegistryError> {
+    pub fn create_object(&self, type_id: TypeId, bytes: &[u8]) -> Result<DbObject, RegistryError> {
         if let Some(factory) = self.factories.get(&type_id) {
             Ok(factory.create_object(bytes)?)
         } else {
@@ -159,10 +169,7 @@ pub mod type_registry {
     }
 
     /// Create a new object from raw bytes the TypeId is extracted from the bytes
-    pub fn create_object(
-        type_id: TypeId,
-        bytes: impl AsRef<[u8]>,
-    ) -> Result<DbObject, RegistryError> {
+    pub fn create_object(type_id: TypeId, bytes: &[u8]) -> Result<DbObject, RegistryError> {
         let registry = REGISTRY.read().unwrap();
         registry.create_object(type_id, bytes)
     }

@@ -21,7 +21,7 @@ impl Object for Int {
         self.0.to_be_bytes().into()
     }
 
-    fn deserialize(bytes: impl AsRef<[u8]>) -> Result<DbObject, ObjectError>
+    fn deserialize(bytes: &[u8]) -> Result<(DbObject, &[u8]), ObjectError>
     where
         Self: Sized,
     {
@@ -29,15 +29,15 @@ impl Object for Int {
 
         // Making sure that bytes is the exact right size for
         // the underlying type of Int
-        if bytes.len() != INTERNAL_INT_SIZE {
+        if bytes.len() < INTERNAL_INT_SIZE {
             Err(ObjectError)
         } else {
             let mut buffer = [0; INTERNAL_INT_SIZE];
-            buffer.copy_from_slice(&bytes);
+            buffer.copy_from_slice(&bytes[..INTERNAL_INT_SIZE]);
 
             let interal = InternalInt::from_be_bytes(buffer);
 
-            Ok(Box::new(Self(interal)))
+            Ok((Box::new(Self(interal)), &bytes[INTERNAL_INT_SIZE..]))
         }
     }
 }

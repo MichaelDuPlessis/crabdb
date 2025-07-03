@@ -1,29 +1,18 @@
-use crate::{DbObject, Object, ObjectError, TypeId};
-
-const TYPE_ID: TypeId = 0;
-
+use crate::ObjectError;
 /// This represents a null object in the database
 /// so just no value
 #[derive(Debug)]
 pub struct Null;
 
-impl Object for Null {
-    fn type_id(&self) -> TypeId {
-        TYPE_ID
-    }
-
-    fn serialize(&self) -> Vec<u8> {
+impl Null {
+    pub fn serialize(&self) -> Vec<u8> {
         Vec::with_capacity(0)
     }
 
-    fn deserialize(bytes: &[u8]) -> Result<(DbObject, &[u8]), ObjectError>
+    pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError>
     where
         Self: Sized,
     {
-        Ok((Box::new(Self), bytes))
-    }
-
-    fn boxed_clone(&self) -> DbObject {
-        Box::new(Self)
+        Ok((Self, bytes))
     }
 }

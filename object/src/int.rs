@@ -1,6 +1,4 @@
-use crate::{DbObject, Object, ObjectError, TypeId};
-
-const TYPE_ID: TypeId = 1;
+use crate::ObjectError;
 
 /// The internal type used to represent an int
 type InternalInt = i64;
@@ -12,16 +10,12 @@ const INTERNAL_INT_SIZE: usize = std::mem::size_of::<InternalInt>();
 #[derive(Debug)]
 pub struct Int(InternalInt);
 
-impl Object for Int {
-    fn type_id(&self) -> TypeId {
-        TYPE_ID
-    }
-
-    fn serialize(&self) -> Vec<u8> {
+impl Int {
+    pub fn serialize(&self) -> Vec<u8> {
         self.0.to_be_bytes().into()
     }
 
-    fn deserialize(bytes: &[u8]) -> Result<(DbObject, &[u8]), ObjectError>
+    pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError>
     where
         Self: Sized,
     {
@@ -37,11 +31,7 @@ impl Object for Int {
 
             let interal = InternalInt::from_be_bytes(buffer);
 
-            Ok((Box::new(Self(interal)), &bytes[INTERNAL_INT_SIZE..]))
+            Ok((Self(interal), &bytes[INTERNAL_INT_SIZE..]))
         }
-    }
-
-    fn boxed_clone(&self) -> DbObject {
-        Box::new(Self(self.0))
     }
 }

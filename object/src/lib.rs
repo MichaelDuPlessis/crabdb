@@ -57,6 +57,11 @@ impl fmt::Display for ObjectError {
 
 impl error::Error for ObjectError {}
 
+/// The TypeId for Null
+const NULL_TYPE_ID: u8 = 0;
+/// The TypeId for Int
+const INT_TYPE_ID: u8 = 1;
+
 /// Represents an Object in the database
 #[derive(Debug, Clone)]
 pub enum Object {
@@ -88,9 +93,9 @@ impl Object {
         // TODO: A macro would be great here
         match type_id {
             // Null
-            0 => Null::deserialize(bytes).map(|(object, _)| Self::Null(object)),
+            NULL_TYPE_ID => Null::deserialize(bytes).map(|(object, _)| Self::Null(object)),
             // Int
-            1 => Int::deserialize(bytes).map(|(object, _)| Self::Int(object)),
+            INT_TYPE_ID => Int::deserialize(bytes).map(|(object, _)| Self::Int(object)),
             // if there is no valid type then return an error
             _ => Err(ObjectError),
         }

@@ -1,4 +1,4 @@
-use crate::ObjectError;
+use crate::{INT_TYPE_ID, ObjectError, TYPE_ID_NUM_BYTES};
 
 /// The internal type used to represent an int
 type InternalInt = i64;
@@ -12,7 +12,18 @@ pub struct Int(InternalInt);
 
 impl Int {
     pub fn serialize(&self) -> Vec<u8> {
-        self.0.to_be_bytes().into()
+        // converting to bytes
+        let bytes = self.0.to_be_bytes();
+
+        // provisioning size
+        // must remember to include space for TypeId
+        let mut data = Vec::with_capacity(TYPE_ID_NUM_BYTES + bytes.len());
+
+        // building bytes
+        data.push(INT_TYPE_ID);
+        data.extend(bytes);
+
+        data
     }
 
     pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError>

@@ -1,3 +1,4 @@
+use core::panic;
 use object::{Key, Object, ObjectError};
 use std::{
     fmt,
@@ -160,6 +161,14 @@ impl Connection {
 
     /// Sends data back to the client
     pub fn send(&mut self, object: Object) -> Result<(), io::Error> {
-        self.stream.write_all(&object.serialize())
+        let object = object.serialize();
+        // getting legnth of payload
+        let payload_size = object.len() as u64;
+
+        // building payload
+        let mut payload = payload_size.to_be_bytes().to_vec();
+        payload.extend(object);
+
+        self.stream.write_all(&payload)
     }
 }

@@ -44,6 +44,8 @@ impl Key {
 
 /// Used to represent the type of the object
 pub type TypeId = u8;
+/// The amount of bytes TypeId requires
+const TYPE_ID_NUM_BYTES: usize = std::mem::size_of::<TypeId>();
 
 /// The type of errors that can occur when constructing an object
 #[derive(Debug)]
@@ -78,14 +80,14 @@ pub type DbObject = Box<dyn Object + Send + Sync>;
 #[derive(Debug)]
 pub struct ObjectFactory<F>
 where
-    F: Fn(&[u8]) -> Result<DbObject, ObjectError>,
+    F: Fn(&[u8]) -> Result<(DbObject, &[u8]), ObjectError>,
 {
     factory_method: F,
 }
 
 impl<F> ObjectFactory<F>
 where
-    F: Fn(&[u8]) -> Result<DbObject, ObjectError>,
+    F: Fn(&[u8]) -> Result<(DbObject, &[u8]), ObjectError>,
 {
     /// Creates a new ObjectFactory
     pub fn new(factory_method: F) -> Self {
@@ -93,8 +95,8 @@ where
     }
 
     /// Creates a Box<dyn Object> from some bytes
-    pub fn create_object(&self, bytes: impl AsRef<[u8]>) -> Result<DbObject, ObjectError> {
-        (self.factory_method)(bytes.as_ref())
+    pub fn create_object<'a>(&self, bytes: &'a [u8]) -> Result<(DbObject, &'a [u8]), ObjectError> {
+        (self.factory_method)(bytes)
     }
 }
 
@@ -134,7 +136,7 @@ impl From<ObjectError> for RegistryError {
 
 /// The type of the factory used in the Registry
 type RegistryObjectFactory =
-    ObjectFactory<Box<dyn Fn(&[u8]) -> Result<DbObject, ObjectError> + Send + Sync>>;
+    ObjectFactory<Box<dyn Fn(&[u8]) -> Result<(DbObject, &[u8]), ObjectError> + Send + Sync>>;
 
 /// Contains a mapping of TypeId's to ObjectFactories and is used to ceate Box<dyn Object>'s
 #[derive(Default)]
@@ -158,7 +160,11 @@ impl Registry {
     }
 
     /// Creates an object using the Registry and the associated ObjectFactory if one exists
-    pub fn create_object(&self, type_id: TypeId, bytes: &[u8]) -> Result<DbObject, RegistryError> {
+    pub fn create_object<'a>(
+        &self,
+        type_id: TypeId,
+        bytes: &'a [u8],
+    ) -> Result<(DbObject, &'a [u8]), RegistryError> {
         if let Some(factory) = self.factories.get(&type_id) {
             Ok(factory.create_object(bytes)?)
         } else {
@@ -172,7 +178,9 @@ static REGISTRY: LazyLock<RwLock<Registry>> = LazyLock::new(Default::default);
 
 /// All methods for a registry
 pub mod type_registry {
-    use crate::{DbObject, REGISTRY, RegistryError, RegistryObjectFactory, TypeId};
+    use crate::{
+        DbObject, REGISTRY, RegistryError, RegistryObjectFactory, TYPE_ID_NUM_BYTES, TypeId,
+    };
 
     /// Register a new type
     pub fn register_factory(
@@ -185,8 +193,21 @@ pub mod type_registry {
     }
 
     /// Create a new object from raw bytes the TypeId is extracted from the bytes
-    pub fn create_object(type_id: TypeId, bytes: &[u8]) -> Result<DbObject, RegistryError> {
+    pub fn create_object(
+        type_id: TypeId,
+        bytes: &[u8],
+    ) -> Result<(DbObject, &[u8]), RegistryError> {
         let registry = REGISTRY.read().unwrap();
         registry.create_object(type_id, bytes)
+    }
+
+    /// Create a new object from raw bytes
+    pub fn create_object_from_bytes(bytes: &[u8]) -> Result<(DbObject, &[u8]), RegistryError> {
+        // First extract the TypeId
+        let mut buffer = [0; TYPE_ID_NUM_BYTES];
+        buffer.copy_from_slice(&bytes[..TYPE_ID_NUM_BYTES]);
+        let type_id = TypeId::from_be_bytes(buffer);
+
+        create_object(type_id, &bytes[TYPE_ID_NUM_BYTES..])
     }
 }

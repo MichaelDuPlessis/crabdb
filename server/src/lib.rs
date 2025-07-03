@@ -113,11 +113,17 @@ impl Command {
 
     /// Creates a new Get command
     fn new_get(data: Vec<u8>) -> Result<Self, ObjectError> {
-        todo!()
+        // extract key
+        let (key, _) = Key::new(data.as_slice())?;
+        Ok(Self::Get(key))
     }
 
     /// Creates a new Set command
     fn new_set(data: Vec<u8>) -> Result<Self, ObjectError> {
+        // first extract Key
+        let (key, data) = Key::new(data.as_slice())?;
+        // extract Object next
+
         todo!()
     }
 }

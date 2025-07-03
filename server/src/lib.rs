@@ -1,4 +1,4 @@
-use object::{Key, ObjectError};
+use object::{Key, ObjectError, type_registry::create_object_from_bytes};
 use std::{
     fmt,
     io::{self, Read},
@@ -122,9 +122,7 @@ impl Command {
     fn new_set(data: Vec<u8>) -> Result<Self, ObjectError> {
         // first extract Key
         let (key, data) = Key::new(data.as_slice())?;
-        // extract Object next
-
-        todo!()
+        Ok(Self::Set(key, data.into()))
     }
 }
 

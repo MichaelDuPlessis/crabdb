@@ -96,3 +96,12 @@ impl Object {
         }
     }
 }
+
+impl From<Option<Object>> for Object {
+    fn from(value: Option<Object>) -> Self {
+        match value {
+            Some(object) => object,
+            None => Self::Null(Null),
+        }
+    }
+}

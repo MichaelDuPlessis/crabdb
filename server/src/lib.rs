@@ -92,7 +92,7 @@ pub enum Command {
     /// Create an Object in the DB
     /// Structure is as follows:
     /// | 8 bytes payload size | 1 byte command type | key | data object |
-    Set(Key, Vec<u8>),
+    Set(Key, Object),
 }
 
 impl Command {
@@ -122,7 +122,7 @@ impl Command {
     fn new_set(data: Vec<u8>) -> Result<Self, ObjectError> {
         // first extract Key
         let (key, data) = Key::new(data.as_slice())?;
-        Ok(Self::Set(key, data.into()))
+        Ok(Self::Set(key, Object::deserialize(data)?))
     }
 }
 

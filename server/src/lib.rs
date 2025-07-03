@@ -1,6 +1,11 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+use object::{Key, ObjectError};
+use std::{
+    io::{self, Read},
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream},
+};
 
 /// The server for the database. It listens over TCP
+#[derive(Debug)]
 pub struct Server {
     /// The open socket
     listener: TcpListener,
@@ -18,8 +23,71 @@ impl Server {
     }
 
     /// Wait for a connnection to be recieved
-    pub fn listen(&self) {
-        self.listener.accept();
+    pub fn listen(&self) -> Result<Connection, io::Error> {
+        let (stream, _) = self.listener.accept()?;
+
+        Ok(Connection::new(stream))
+    }
+}
+
+/// The size of the payload in bytes
+type PayloadSize = u64;
+/// The Number of bytes PayloadSize requires
+const PAYLOAD_SIZE_NUM_BYTES: usize = std::mem::size_of::<PayloadSize>();
+
+/// The size of the payload in bytes
+type CommandType = u8;
+/// The Number of bytes PayloadSize requires
+const COMMAND_TYPE_NUM_BYTES: usize = std::mem::size_of::<CommandType>();
+
+/// The types of errors that can occur when building a Command
+#[derive(Debug)]
+pub enum CommandError {
+    /// When an error occurs with the underlying network
+    Network(io::Error),
+    /// When an error occurs while building an Object
+    Object(object::ObjectError),
+    /// The Command requested does not exist
+    Invalid,
+}
+
+/// The kind of commands a client can send
+#[derive(Debug)]
+pub enum Command {
+    /// Get an Object from its Key
+    /// Structure is as follows:
+    /// | 8 bytes payload size | 1 byte command type | key |
+    Get(Key),
+    /// Create an Object in the DB
+    /// Structure is as follows:
+    /// | 8 bytes payload size | 1 byte command type | key | data object |
+    Set(Key, Vec<u8>),
+}
+
+impl Command {
+    /// The value for the Get Command
+    const GET: u8 = 0;
+    /// The value for the Set Command
+    const SET: u8 = 1;
+
+    /// Creats a new command based on the CommandType and the data
+    pub fn new(command_type: CommandType, data: Vec<u8>) -> Result<Self, CommandError> {
+        match command_type {
+            Self::GET => Self::new_get(data),
+            Self::SET => Self::new_set(data),
+            _ => return Err(CommandError::Invalid),
+        }
+        .map_err(|err| CommandError::Object(err))
+    }
+
+    /// Creates a new Get command
+    fn new_get(data: Vec<u8>) -> Result<Self, ObjectError> {
+        todo!()
+    }
+
+    /// Creates a new Set command
+    fn new_set(data: Vec<u8>) -> Result<Self, ObjectError> {
+        todo!()
     }
 }
 
@@ -27,4 +95,31 @@ impl Server {
 pub struct Connection {
     /// The TcpStream which is connect to the client
     stream: TcpStream,
+}
+
+impl Connection {
+    /// Creates a new connection from TcpStream
+    pub fn new(stream: TcpStream) -> Self {
+        Self { stream }
+    }
+
+    /// Recieves a command from the client
+    pub fn recieve(&mut self) -> Result<Command, io::Error> {
+        // first receive the number of bytes being sent
+        let mut buffer = [0; PAYLOAD_SIZE_NUM_BYTES];
+        self.stream.read_exact(&mut buffer)?;
+        let payload_size = PayloadSize::from_be_bytes(buffer);
+
+        // recieve the command type
+        // TODO: I know this code is duplicatd I am still trying to decide if I should use a macro, a common trait or just leave it
+        let mut buffer = [0; COMMAND_TYPE_NUM_BYTES];
+        self.stream.read_exact(&mut buffer)?;
+        let command_type = CommandType::from_be_bytes(buffer);
+
+        // reading the rest of the data
+        let mut data = vec![0; payload_size as usize - COMMAND_TYPE_NUM_BYTES];
+        self.stream.read_exact(&mut data)?;
+
+        Command::new(command_type, data)
+    }
 }

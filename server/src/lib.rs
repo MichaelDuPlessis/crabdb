@@ -1,5 +1,6 @@
 use object::{Key, ObjectError};
 use std::{
+    fmt,
     io::{self, Read},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream},
 };
@@ -48,7 +49,37 @@ pub enum CommandError {
     /// When an error occurs while building an Object
     Object(object::ObjectError),
     /// The Command requested does not exist
-    Invalid,
+    Invalid(CommandType),
+}
+
+impl fmt::Display for CommandError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CommandError::Network(error) => write!(f, "a network error occured {}", error),
+            CommandError::Object(object_error) => {
+                write!(f, "unable to create object {}", object_error)
+            }
+            CommandError::Invalid(command_type) => write!(
+                f,
+                "the command type sent was invalid, received: {}",
+                command_type
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CommandError {}
+
+impl From<io::Error> for CommandError {
+    fn from(value: io::Error) -> Self {
+        Self::Network(value)
+    }
+}
+
+impl From<object::ObjectError> for CommandError {
+    fn from(value: object::ObjectError) -> Self {
+        Self::Object(value)
+    }
 }
 
 /// The kind of commands a client can send
@@ -75,7 +106,7 @@ impl Command {
         match command_type {
             Self::GET => Self::new_get(data),
             Self::SET => Self::new_set(data),
-            _ => return Err(CommandError::Invalid),
+            _ => return Err(CommandError::Invalid(command_type)),
         }
         .map_err(|err| CommandError::Object(err))
     }
@@ -104,7 +135,7 @@ impl Connection {
     }
 
     /// Recieves a command from the client
-    pub fn recieve(&mut self) -> Result<Command, io::Error> {
+    pub fn recieve(&mut self) -> Result<Command, CommandError> {
         // first receive the number of bytes being sent
         let mut buffer = [0; PAYLOAD_SIZE_NUM_BYTES];
         self.stream.read_exact(&mut buffer)?;

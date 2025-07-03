@@ -22,4 +22,8 @@ impl Object for Null {
     {
         Ok((Box::new(Self), bytes))
     }
+
+    fn boxed_clone(&self) -> DbObject {
+        Box::new(Self)
+    }
 }

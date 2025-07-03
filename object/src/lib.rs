@@ -14,7 +14,7 @@ type KeyLen = u16;
 const KEY_LEN_NUM_BYTES: usize = std::mem::size_of::<KeyLen>();
 
 /// The value under which an object is stored in the database
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Key(Vec<u8>);
 
 impl Key {
@@ -66,6 +66,9 @@ pub trait Object: std::fmt::Debug {
 
     /// Turn the object into raw bytes
     fn serialize(&self) -> Vec<u8>;
+
+    /// Create a boxed copy of an Object as a DbObject
+    fn boxed_clone(&self) -> DbObject;
 
     /// Turn raw bytes into an object
     fn deserialize(bytes: &[u8]) -> Result<(DbObject, &[u8]), ObjectError>

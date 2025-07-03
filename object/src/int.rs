@@ -40,4 +40,8 @@ impl Object for Int {
             Ok((Box::new(Self(interal)), &bytes[INTERNAL_INT_SIZE..]))
         }
     }
+
+    fn boxed_clone(&self) -> DbObject {
+        Box::new(Self(self.0))
+    }
 }

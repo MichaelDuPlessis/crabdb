@@ -1,72 +1,174 @@
-//! This module is responsible for handling recieving of requests and the sending respones
-
-use crab_core::{
-    Key,
-    object::{DbObject, ObjectData},
+use core::panic;
+use object::{Key, Object, ObjectError};
+use std::{
+    fmt,
+    io::{self, Read, Write},
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream},
 };
 
-pub mod tcp_server;
-
-/// The kinds of errors that can occur when recieving a request
+/// The server for the database. It listens over TCP
 #[derive(Debug)]
-pub enum RecieveError {
-    /// The request type sent is invalid
-    InvalidType,
-    /// Failed to recieve data from client
-    RecieveFailed,
-    /// The data recieved was not compelete
-    Incomplete,
-    /// The object provided was invalid such as being malformed or have a lenght of 0
-    InvalidObject,
-    /// The data type specified is invalid
-    InvalidDataType,
-    /// The key is invalid such as not being a valid utf8 string
-    InvalidKey,
+pub struct Server {
+    /// The open socket
+    listener: TcpListener,
 }
 
-/// A request sent by a client
+impl Server {
+    /// Create a new server
+    pub fn new(port: u16) -> Self {
+        // if it is not possilbe to bind to a port just fail
+        let listener =
+            TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), port))
+                .expect("Failed to bind to port: {port}");
+
+        Self { listener }
+    }
+
+    /// Wait for a connnection to be recieved
+    pub fn listen(&self) -> Result<Connection, io::Error> {
+        let (stream, _) = self.listener.accept()?;
+
+        Ok(Connection::new(stream))
+    }
+}
+
+/// The size of the payload in bytes
+type PayloadSize = u64;
+/// The Number of bytes PayloadSize requires
+const PAYLOAD_SIZE_NUM_BYTES: usize = std::mem::size_of::<PayloadSize>();
+
+/// The size of the payload in bytes
+type CommandType = u8;
+/// The Number of bytes PayloadSize requires
+const COMMAND_TYPE_NUM_BYTES: usize = std::mem::size_of::<CommandType>();
+
+/// The types of errors that can occur when building a Command
 #[derive(Debug)]
-pub enum Request {
-    /// Get data from a specific key
-    // | 2 bytes key length (n) | n bytes key |
+pub enum CommandError {
+    /// When an error occurs with the underlying network
+    Network(io::Error),
+    /// When an error occurs while building an Object
+    Object(object::ObjectError),
+    /// The Command requested does not exist
+    Invalid(CommandType),
+}
+
+impl fmt::Display for CommandError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CommandError::Network(error) => write!(f, "a network error occured {}", error),
+            CommandError::Object(object_error) => {
+                write!(f, "unable to create object {}", object_error)
+            }
+            CommandError::Invalid(command_type) => write!(
+                f,
+                "the command type sent was invalid, received: {}",
+                command_type
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CommandError {}
+
+impl From<io::Error> for CommandError {
+    fn from(value: io::Error) -> Self {
+        Self::Network(value)
+    }
+}
+
+impl From<object::ObjectError> for CommandError {
+    fn from(value: object::ObjectError) -> Self {
+        Self::Object(value)
+    }
+}
+
+/// The kind of commands a client can send
+#[derive(Debug)]
+pub enum Command {
+    /// Get an Object from its Key
+    /// Structure is as follows:
+    /// | 8 bytes payload size | 1 byte command type | key |
     Get(Key),
-    /// Sets data on a specific key
-    // | 2 bytes key length (n) | n bytes key | 1 byte data type | rest of the bytes data |
-    Set(Key, ObjectData),
-    /// The connection is closed
-    Terminated,
+    /// Create an Object in the DB
+    /// Structure is as follows:
+    /// | 8 bytes payload size | 1 byte command type | key | data object |
+    Set(Key, Object),
 }
 
-/// The kinds of errors that can occuer when sending a request
-#[derive(Debug)]
-pub enum ResponseError {
-    /// The response failed to send
-    ResponseFailed,
+impl Command {
+    /// The value for the Get Command
+    const GET: u8 = 0;
+    /// The value for the Set Command
+    const SET: u8 = 1;
+
+    /// Creats a new command based on the CommandType and the data
+    pub fn new(command_type: CommandType, data: Vec<u8>) -> Result<Self, CommandError> {
+        match command_type {
+            Self::GET => Self::new_get(data),
+            Self::SET => Self::new_set(data),
+            _ => return Err(CommandError::Invalid(command_type)),
+        }
+        .map_err(|err| CommandError::Object(err))
+    }
+
+    /// Creates a new Get command
+    fn new_get(data: Vec<u8>) -> Result<Self, ObjectError> {
+        // extract key
+        let (key, _) = Key::new(data.as_slice())?;
+        Ok(Self::Get(key))
+    }
+
+    /// Creates a new Set command
+    fn new_set(data: Vec<u8>) -> Result<Self, ObjectError> {
+        // first extract Key
+        let (key, data) = Key::new(data.as_slice())?;
+        Ok(Self::Set(key, Object::deserialize(data)?))
+    }
 }
 
-/// A response sent by the server
-#[derive(Debug)]
-pub enum Response {
-    /// The request was successful and there is a payload
-    Payload(DbObject),
-    /// There was an error with the request
-    Error,
+/// Represents a connection to a client
+pub struct Connection {
+    /// The TcpStream which is connect to the client
+    stream: TcpStream,
 }
 
-/// All methods that a Server must implement to be usable
-pub trait Server {
-    type Handler: Connection + Send;
+impl Connection {
+    /// Creates a new connection from TcpStream
+    pub fn new(stream: TcpStream) -> Self {
+        Self { stream }
+    }
 
-    /// The request just needs to be able to listen for connections
-    /// it is then responsible for processing the requests and returning a response
-    fn listen(&self) -> Self::Handler;
-}
+    /// Recieves a command from the client
+    pub fn recieve(&mut self) -> Result<Command, CommandError> {
+        // first receive the number of bytes being sent
+        let mut buffer = [0; PAYLOAD_SIZE_NUM_BYTES];
+        self.stream.read_exact(&mut buffer)?;
+        let payload_size = PayloadSize::from_be_bytes(buffer);
 
-/// Represents some connection to the server
-pub trait Connection {
-    /// Retrieve request from a connection from a client. This blocks until a request is received or the connection is closed
-    fn receive(&mut self) -> Result<Request, RecieveError>;
+        // recieve the command type
+        // TODO: I know this code is duplicatd I am still trying to decide if I should use a macro, a common trait or just leave it
+        let mut buffer = [0; COMMAND_TYPE_NUM_BYTES];
+        self.stream.read_exact(&mut buffer)?;
+        let command_type = CommandType::from_be_bytes(buffer);
 
-    /// Send data to connection
-    fn send(&mut self, response: Response) -> Result<(), ResponseError>;
+        // reading the rest of the data
+        let mut data = vec![0; payload_size as usize - COMMAND_TYPE_NUM_BYTES];
+        self.stream.read_exact(&mut data)?;
+
+        Command::new(command_type, data)
+    }
+
+    /// Sends data back to the client
+    pub fn send(&mut self, object: Object) -> Result<(), io::Error> {
+        let object = object.serialize();
+        // getting legnth of payload
+        let payload_size = object.len() as u64;
+
+        // building payload
+        let mut payload = payload_size.to_be_bytes().to_vec();
+        payload.extend(object);
+
+        self.stream.write_all(&payload)
+    }
 }

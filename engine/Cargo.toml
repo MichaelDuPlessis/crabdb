@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+object = { path = "../object" }
 server = { path = "../server" }
 storage = { path = "../storage" }
-threadpool = { path = "../threadpool" }
 logging = { path = "../logging" }
-crab-core = { path = "../crab-core" }

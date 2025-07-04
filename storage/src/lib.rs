@@ -1,25 +1,28 @@
-use crab_core::{Key, object::DbObject};
-use std::borrow::Borrow;
+use object::{Key, Object};
+use std::collections::HashMap;
 
-pub mod in_memory_store;
+/// This trait means that the type cna handle storing objects in the database
+pub trait Store {
+    /// Store an Object on a Key. If an object is already stored on that Key return it
+    /// otherwise return the Null Object
+    fn store(&mut self, key: Key, object: Object) -> Object;
 
-/// The types of errors that can occur with a storage medium
-#[derive(Debug)]
-pub enum StorageError {
-    /// The value failed to be set
-    SetFailed,
+    /// Retrieve an Object from its Key if it exists otherwise return the Null Object
+    fn retrieve(&self, key: Key) -> Object;
 }
 
-type Result<T> = std::result::Result<T, StorageError>;
+/// Stores data in memory only
+#[derive(Debug, Default)]
+pub struct InMemoryStore {
+    map: HashMap<Key, Object>,
+}
 
-/// A common interface for storing items
-pub trait Storage {
-    /// Saves an object in the database under a Key and returns the old object under the key if there is one
-    fn set(&self, key: Key, object: DbObject) -> Result<DbObject>;
+impl Store for InMemoryStore {
+    fn store(&mut self, key: Key, object: Object) -> Object {
+        self.map.insert(key, object).into()
+    }
 
-    /// Gets an object saved in the database under a key or none if the key is not found
-    fn get(&self, key: impl Borrow<Key>) -> Result<DbObject>;
-
-    /// Deletes an object from the database under a key and returns the object or none if the key is not found
-    fn delete(&self, key: impl Borrow<Key>) -> Result<DbObject>;
+    fn retrieve(&self, key: Key) -> Object {
+        self.map.get(&key).cloned().into()
+    }
 }

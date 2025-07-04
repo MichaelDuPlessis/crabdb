@@ -1,10 +1,9 @@
 use core::error;
-use int::Int;
-use null::Null;
 use std::fmt;
 
-pub mod int;
-pub mod null;
+use types::{int::Int, null::Null};
+
+pub mod types;
 
 /// The data type used to store the key length
 type KeyLen = u16;

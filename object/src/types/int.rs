@@ -1,4 +1,6 @@
-use crate::{INT_TYPE_ID, ObjectError, TYPE_ID_NUM_BYTES};
+use crate::ObjectError;
+
+use super::type_ids::{INT_TYPE_ID, TYPE_ID_NUM_BYTES};
 
 /// The internal type used to represent an int
 type InternalInt = i64;

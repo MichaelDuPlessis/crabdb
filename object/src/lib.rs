@@ -1,7 +1,11 @@
 use core::error;
 use std::fmt;
-
-use types::{int::Int, null::Null};
+use types::{
+    int::Int,
+    null::Null,
+    text::Text,
+    type_ids::{self, TYPE_ID_NUM_BYTES, TypeId},
+};
 
 pub mod types;
 
@@ -39,11 +43,6 @@ impl Key {
     }
 }
 
-/// Used to represent the type of the object
-pub type TypeId = u8;
-/// The amount of bytes TypeId requires
-const TYPE_ID_NUM_BYTES: usize = std::mem::size_of::<TypeId>();
-
 /// The type of errors that can occur when constructing an object
 #[derive(Debug)]
 pub struct ObjectError;
@@ -56,11 +55,6 @@ impl fmt::Display for ObjectError {
 
 impl error::Error for ObjectError {}
 
-/// The TypeId for Null
-const NULL_TYPE_ID: u8 = 0;
-/// The TypeId for Int
-const INT_TYPE_ID: u8 = 1;
-
 /// Represents an Object in the database
 #[derive(Debug, Clone)]
 pub enum Object {
@@ -68,6 +62,8 @@ pub enum Object {
     Null(Null),
     /// A signed integer
     Int(Int),
+    /// A text (string) object
+    Text(Text),
 }
 
 impl Object {
@@ -77,6 +73,7 @@ impl Object {
         match self {
             Object::Null(null) => null.serialize(),
             Object::Int(int) => int.serialize(),
+            Object::Text(text) => text.serialize(),
         }
     }
 
@@ -92,9 +89,14 @@ impl Object {
         // TODO: A macro would be great here
         match type_id {
             // Null
-            NULL_TYPE_ID => Null::deserialize(bytes).map(|(object, _)| Self::Null(object)),
+            type_ids::NULL_TYPE_ID => {
+                Null::deserialize(bytes).map(|(object, _)| Self::Null(object))
+            }
             // Int
-            INT_TYPE_ID => Int::deserialize(bytes).map(|(object, _)| Self::Int(object)),
+            type_ids::INT_TYPE_ID => Int::deserialize(bytes).map(|(object, _)| Self::Int(object)),
+            type_ids::TEXT_TYPE_ID => {
+                Text::deserialize(bytes).map(|(object, _)| Self::Text(object))
+            }
             // if there is no valid type then return an error
             _ => Err(ObjectError),
         }

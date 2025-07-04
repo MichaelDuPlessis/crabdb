@@ -76,6 +76,7 @@ dependencies = [
  "object",
  "server",
  "storage",
+ "threadpool",
 ]
 
 [[package]]

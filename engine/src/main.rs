@@ -1,6 +1,8 @@
 use logging::{error, info, init_logger, trace};
 use server::{Command, Server};
+use std::sync::Arc;
 use storage::{InMemoryStore, Store};
+use threadpool::ThreadPool;
 
 /// The port to listen on
 const PORT: u16 = 7227;
@@ -15,7 +17,10 @@ fn main() {
     let server = Server::new(PORT);
 
     // used to store the objects
-    let mut storage = InMemoryStore::default();
+    let storage = Arc::new(InMemoryStore::default());
+
+    // Creating a threadpool
+    let mut thread_pool = ThreadPool::default();
 
     info!("Listening on port: {PORT}");
     loop {
@@ -25,26 +30,29 @@ fn main() {
         };
         info!("Connection recieved");
 
-        loop {
-            let command = match connection.recieve() {
-                Ok(command) => command,
-                Err(e) => {
-                    error!("Error recieving command: {e}");
+        let storage = Arc::clone(&storage);
+        thread_pool.execute(move || {
+            loop {
+                let command = match connection.recieve() {
+                    Ok(command) => command,
+                    Err(e) => {
+                        error!("Error recieving command: {e}");
+                        break;
+                    }
+                };
+                trace!("Command recieved: {:?}", command);
+
+                let object = match command {
+                    Command::Get(key) => storage.retrieve(key),
+                    Command::Set(key, object) => storage.store(key, object),
+                };
+
+                trace!("Sending response: {:?}", object);
+                if let Err(e) = connection.send(object) {
+                    error!("Error sending command: {e}");
                     break;
-                }
-            };
-            trace!("Command recieved: {:?}", command);
-
-            let object = match command {
-                Command::Get(key) => storage.retrieve(key),
-                Command::Set(key, object) => storage.store(key, object),
-            };
-
-            trace!("Sending response: {:?}", object);
-            if let Err(e) = connection.send(object) {
-                error!("Error sending command: {e}");
-                break;
-            };
-        }
+                };
+            }
+        });
     }
 }

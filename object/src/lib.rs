@@ -13,7 +13,7 @@ const KEY_LEN_NUM_BYTES: usize = std::mem::size_of::<KeyLen>();
 
 /// The value under which an object is stored in the database
 #[derive(Debug, Hash, PartialEq, Eq)]
-pub struct Key(Vec<u8>);
+pub struct Key(Box<[u8]>); // we don't care about the capcity
 
 impl Key {
     /// Create a new Key from raw bytes
@@ -29,7 +29,7 @@ impl Key {
             let key_len = KeyLen::from_be_bytes(buffer) as usize;
 
             if key_len > 0 {
-                let key = Vec::from(&bytes[KEY_LEN_NUM_BYTES..key_len + KEY_LEN_NUM_BYTES]);
+                let key = Box::from(&bytes[KEY_LEN_NUM_BYTES..key_len + KEY_LEN_NUM_BYTES]);
 
                 Ok((Self(key), &bytes[key_len + KEY_LEN_NUM_BYTES..]))
             } else {

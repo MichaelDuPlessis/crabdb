@@ -1,5 +1,5 @@
+use concurrent_map::ConcurrentMap;
 use object::{Key, Object};
-use std::collections::HashMap;
 
 /// This trait means that the type cna handle storing objects in the database
 pub trait Store {
@@ -14,7 +14,7 @@ pub trait Store {
 /// Stores data in memory only
 #[derive(Debug, Default)]
 pub struct InMemoryStore {
-    map: HashMap<Key, Object>,
+    map: ConcurrentMap<Key, Object>,
 }
 
 impl Store for InMemoryStore {
@@ -23,6 +23,6 @@ impl Store for InMemoryStore {
     }
 
     fn retrieve(&self, key: Key) -> Object {
-        self.map.get(&key).cloned().into()
+        self.map.get(&key).map(|object| object.clone()).into()
     }
 }

@@ -1,4 +1,3 @@
-use core::panic;
 use object::{Key, Object, ObjectError};
 use std::{
     fmt,

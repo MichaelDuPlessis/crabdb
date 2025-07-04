@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 object = { path = "../object" }
+concurrent-map = { path = "../concurrent-map" }

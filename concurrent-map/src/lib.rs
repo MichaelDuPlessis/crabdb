@@ -8,9 +8,10 @@ use std::{
 type Shard<K, V> = RwLock<HashMap<K, V>>;
 
 /// Holds an immutable reference to a value and a guard to prevent race conditions
+#[derive(Debug)]
 pub struct Ref<'a, K, V> {
     /// The guard of the map
-    guard: RwLockReadGuard<'a, HashMap<K, V>>,
+    _guard: RwLockReadGuard<'a, HashMap<K, V>>,
     /// The value being returned
     value: *const V,
 }
@@ -24,9 +25,10 @@ impl<'a, K, V> ops::Deref for Ref<'a, K, V> {
 }
 
 /// Holds an mutable reference to a value and a guard to prevent race conditions
+#[derive(Debug)]
 pub struct RefMut<'a, K, V> {
     /// The guard of the map
-    guard: RwLockWriteGuard<'a, HashMap<K, V>>,
+    _guard: RwLockWriteGuard<'a, HashMap<K, V>>,
     /// The value being returned
     value: *mut V,
 }
@@ -46,6 +48,7 @@ impl<'a, K, V> ops::DerefMut for RefMut<'a, K, V> {
 }
 
 /// A HashMap that can be shared between threads safely while still remaining effiecient
+#[derive(Debug)]
 pub struct ConcurrentMap<K, V> {
     /// The shards in the hashmap
     shards: Vec<Shard<K, V>>,
@@ -112,7 +115,7 @@ where
             Some(value) => {
                 let value_ptr = value as *const V;
                 Some(Ref {
-                    guard: map_guard,
+                    _guard: map_guard,
                     value: value_ptr,
                 })
             }
@@ -131,7 +134,7 @@ where
             Some(value) => {
                 let value_ptr = value as *mut V;
                 Some(RefMut {
-                    guard: map_guard,
+                    _guard: map_guard,
                     value: value_ptr,
                 })
             }
@@ -146,5 +149,11 @@ where
         // inserting the value
         let mut map = shard.write().unwrap();
         map.remove(key)
+    }
+}
+
+impl<K, V> Default for ConcurrentMap<K, V> {
+    fn default() -> Self {
+        Self::new(4)
     }
 }

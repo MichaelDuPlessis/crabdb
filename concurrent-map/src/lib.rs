@@ -1,10 +1,49 @@
 use std::{
     collections::HashMap,
     hash::{DefaultHasher, Hash, Hasher},
-    sync::RwLock,
+    ops,
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
 type Shard<K, V> = RwLock<HashMap<K, V>>;
+
+/// Holds an immutable reference to a value and a guard to prevent race conditions
+pub struct Ref<'a, K, V> {
+    /// The guard of the map
+    guard: RwLockReadGuard<'a, HashMap<K, V>>,
+    /// The value being returned
+    value: *const V,
+}
+
+impl<'a, K, V> ops::Deref for Ref<'a, K, V> {
+    type Target = V;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.value }
+    }
+}
+
+/// Holds an mutable reference to a value and a guard to prevent race conditions
+pub struct RefMut<'a, K, V> {
+    /// The guard of the map
+    guard: RwLockWriteGuard<'a, HashMap<K, V>>,
+    /// The value being returned
+    value: *mut V,
+}
+
+impl<'a, K, V> ops::Deref for RefMut<'a, K, V> {
+    type Target = V;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.value }
+    }
+}
+
+impl<'a, K, V> ops::DerefMut for RefMut<'a, K, V> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *self.value }
+    }
+}
 
 /// A HashMap that can be shared between threads safely while still remaining effiecient
 pub struct ConcurrentMap<K, V> {
@@ -63,17 +102,41 @@ where
     }
 
     /// Reads an element from the map and returns None if no element is found
-    /// The element retrieved is cloned
-    pub fn get_cloned(&self, key: &K) -> Option<V>
-    where
-        V: Clone,
-    {
+    pub fn get<'a>(&'a self, key: &K) -> Option<Ref<'a, K, V>> {
         // getting the shard
         let shard = self.shard(key);
 
         // getting the element
-        let map = shard.read().unwrap();
-        map.get(key).cloned()
+        let map_guard = shard.read().unwrap();
+        match map_guard.get(key) {
+            Some(value) => {
+                let value_ptr = value as *const V;
+                Some(Ref {
+                    guard: map_guard,
+                    value: value_ptr,
+                })
+            }
+            None => None,
+        }
+    }
+
+    /// Reads an element from the map and returns None if no element is found
+    pub fn get_mut<'a>(&'a self, key: &K) -> Option<RefMut<'a, K, V>> {
+        // getting the shard
+        let shard = self.shard(key);
+
+        // getting the element
+        let mut map_guard = shard.write().unwrap();
+        match map_guard.get_mut(key) {
+            Some(value) => {
+                let value_ptr = value as *mut V;
+                Some(RefMut {
+                    guard: map_guard,
+                    value: value_ptr,
+                })
+            }
+            None => None,
+        }
     }
 
     /// Removes an element from the ConcurrentMap. Returns None if the element does not exist

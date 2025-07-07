@@ -28,10 +28,7 @@ impl Int {
         data
     }
 
-    pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError>
-    where
-        Self: Sized,
-    {
+    pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError> {
         let bytes = bytes.as_ref();
 
         // Making sure that bytes is the exact right size for

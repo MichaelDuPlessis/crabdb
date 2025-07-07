@@ -3,7 +3,7 @@ use crate::ObjectError;
 use super::type_ids::{TEXT_TYPE_ID, TYPE_ID_NUM_BYTES};
 
 /// The data type used to store the length of Text in the payload
-type TextLen = u32;
+type TextLen = u16;
 /// The nubmer of bytes used to reprsent the length of Text in the Payload
 const TEXT_LEN_NUM_BYTES: usize = std::mem::size_of::<TextLen>();
 
@@ -22,16 +22,13 @@ impl Text {
 
         // building bytes
         data.push(TEXT_TYPE_ID);
-        data.extend(bytes.len().to_be_bytes());
+        data.extend((bytes.len() as TextLen).to_be_bytes());
         data.extend(bytes);
 
         data
     }
 
-    pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError>
-    where
-        Self: Sized,
-    {
+    pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError> {
         let bytes = bytes.as_ref();
 
         // Making sure that bytes is the exact right size for

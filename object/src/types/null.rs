@@ -9,10 +9,7 @@ impl Null {
         NULL_TYPE_ID.to_be_bytes().into()
     }
 
-    pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError>
-    where
-        Self: Sized,
-    {
+    pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError> {
         Ok((Self, bytes))
     }
 }

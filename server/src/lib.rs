@@ -93,19 +93,26 @@ pub enum Command {
     /// Structure is as follows:
     /// | 8 bytes payload size | 1 byte command type | key | data object |
     Set(Key, Object),
+    /// Close the connection to the client
+    /// Structure is as follows:
+    /// | 8 bytes payload size | 1 byte command type |
+    Close,
 }
 
 impl Command {
     /// The value for the Get Command
-    const GET: u8 = 0;
+    const GET: CommandType = 0;
     /// The value for the Set Command
-    const SET: u8 = 1;
+    const SET: CommandType = 1;
+    /// Value for the Close Command
+    const CLOSE: CommandType = 255;
 
     /// Creats a new command based on the CommandType and the data
     pub fn new(command_type: CommandType, data: Vec<u8>) -> Result<Self, CommandError> {
         match command_type {
             Self::GET => Self::new_get(data),
             Self::SET => Self::new_set(data),
+            Self::CLOSE => Ok(Self::Close),
             _ => return Err(CommandError::Invalid(command_type)),
         }
         .map_err(|err| CommandError::Object(err))

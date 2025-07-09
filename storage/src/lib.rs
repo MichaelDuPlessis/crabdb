@@ -9,6 +9,9 @@ pub trait Store {
 
     /// Retrieve an Object from its Key if it exists otherwise return the Null Object
     fn retrieve(&self, key: Key) -> Object;
+
+    /// Delete an Object from from its Key and return the deleted Object
+    fn remove(&self, key: Key) -> Object;
 }
 
 /// Stores data in memory only
@@ -24,5 +27,9 @@ impl Store for InMemoryStore {
 
     fn retrieve(&self, key: Key) -> Object {
         self.map.get(&key).map(|object| object.clone()).into()
+    }
+
+    fn remove(&self, key: Key) -> Object {
+        self.map.remove(&key).into()
     }
 }

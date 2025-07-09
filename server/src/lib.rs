@@ -93,6 +93,10 @@ pub enum Command {
     /// Structure is as follows:
     /// | 8 bytes payload size | 1 byte command type | key | data object |
     Set(Key, Object),
+    /// Deletee an Object from its Key
+    /// Structure is as follows:
+    /// | 8 bytes payload size | 1 byte command type | key |
+    Delete(Key),
     /// Close the connection to the client
     /// Structure is as follows:
     /// | 8 bytes payload size | 1 byte command type |
@@ -104,6 +108,8 @@ impl Command {
     const GET: CommandType = 0;
     /// The value for the Set Command
     const SET: CommandType = 1;
+    /// The value for the Delete Command
+    const DELETE: CommandType = 2;
     /// Value for the Close Command
     const CLOSE: CommandType = 255;
 
@@ -112,6 +118,7 @@ impl Command {
         match command_type {
             Self::GET => Self::new_get(data),
             Self::SET => Self::new_set(data),
+            Self::DELETE => Self::new_delete(data),
             Self::CLOSE => Ok(Self::Close),
             _ => return Err(CommandError::Invalid(command_type)),
         }
@@ -130,6 +137,13 @@ impl Command {
         // first extract Key
         let (key, data) = Key::new(data.as_slice())?;
         Ok(Self::Set(key, Object::deserialize(data)?))
+    }
+
+    /// Creates a new Delete command
+    fn new_delete(data: Vec<u8>) -> Result<Self, ObjectError> {
+        // extract key
+        let (key, _) = Key::new(data.as_slice())?;
+        Ok(Self::Delete(key))
     }
 }
 

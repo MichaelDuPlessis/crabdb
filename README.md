@@ -1,6 +1,6 @@
 # CrabDB
 
-A lightweight, educational NoSQL database written in Rust. CrabDB is designed for learning database internals and rapid prototyping, not high-performance production workloads.
+A lightweight, NoSQL database written in Rust. CrabDB is designed for rapid prototyping or lightweight workloads, not high-performance production workloads.
 
 ## Architecture
 
@@ -43,6 +43,7 @@ python3 client/cli.py
 # Direct commands
 python3 client/cli.py set mykey int 42
 python3 client/cli.py get mykey
+python3 client/cli.py del mykey
 ```
 
 ## Protocol Specification
@@ -78,6 +79,15 @@ Store a key-value pair.
 | Key        | variable    | UTF-8 encoded key              |
 | Data Type  | 1           | Value type (`0`/`1`/`2`)       |
 | Data       | variable    | Type-specific value data       |
+
+#### DELETE Command (Type: `2`)
+Delete a value by key.
+
+**Request Payload:**
+| Field      | Size (bytes) | Description           |
+|------------|-------------|-----------------------|
+| Key Length | 2           | Length of key string  |
+| Key        | variable    | UTF-8 encoded key     |
 
 #### CLOSE Command (Type: `255`)
 Close the connection. No payload required.
@@ -121,32 +131,3 @@ Currently implements in-memory storage only. The `Store` trait allows for plugga
 ### Error Handling
 - Comprehensive error types for network, parsing, and object construction failures
 - Graceful connection handling with proper cleanup
-
-## Development Goals
-
-This project prioritizes:
-1. **Educational value** - Learn database internals by building from scratch
-2. **Minimal dependencies** - Custom implementations of core components
-3. **Clean architecture** - Modular design with clear separation of concerns
-4. **Type safety** - Leverage Rust's type system for correctness
-
-## Limitations
-
-- **In-memory only** - No persistence across restarts
-- **Simple protocol** - No authentication, compression, or advanced features
-- **Basic error handling** - Generic error responses
-- **No indexing** - Linear search for non-key operations
-- **Limited types** - Only Null, Int, and Text supported
-
-## Future Enhancements
-
-- Disk-based persistence
-- Additional data types (Boolean, Float, List, Object)
-- Query language for filtering and sorting
-- Secondary indexes
-- Compression and authentication
-- Replication and clustering
-
----
-
-*CrabDB is a learning project focused on understanding database fundamentals. It's not intended for production use.*

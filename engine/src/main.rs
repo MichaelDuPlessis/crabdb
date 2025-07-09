@@ -45,6 +45,7 @@ fn main() {
                 let object = match command {
                     Command::Get(key) => storage.retrieve(key),
                     Command::Set(key, object) => storage.store(key, object),
+                    Command::Delete(key) => todo!(),
                     Command::Close => break,
                 };
 

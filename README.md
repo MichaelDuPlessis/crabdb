@@ -1,108 +1,152 @@
 # CrabDB
 
-CrabDB is a database designed to be easy to use and quick to iterate on. It is not meant for high performance workloads
-and is instead meant to be used for prototyping or workloads that are not going to be "stress tested".
+A lightweight, educational NoSQL database written in Rust. CrabDB is designed for learning database internals and rapid prototyping, not high-performance production workloads.
 
-## Goal
+## Architecture
 
-The goal of this project is to create an easy to use NoSQL database that feels like querying a json object. It is meant to be used
-in small projects or for prototyping.
+CrabDB is built as a modular Rust workspace with the following components:
 
-Another goal of this project is to use as little external dependencies as possible and have everything be coded from scratch as this
-is primarily (at least for now) just a fun little side project to learn various things.
+- **`engine`** - Main server binary that coordinates all components
+- **`server`** - TCP server handling client connections and protocol parsing
+- **`object`** - Type system and serialization for database values
+- **`storage`** - Storage backends (currently in-memory only)
+- **`concurrent-map`** - Thread-safe hash map implementation
+- **`threadpool`** - Custom thread pool for handling concurrent connections
+- **`logging`** - Custom logging system
+- **`client`** - Python CLI client for testing and interaction
 
-## TCP Protocol
+## Features
 
-Interaction with the database is done over a TCP connection. All integer values in the protocol are sent in **big-endian** format.
+- **TCP-based protocol** with binary serialization
+- **Concurrent connections** using a custom thread pool
+- **Type-safe data storage** with Null, Int (i64), and Text types
+- **Thread-safe in-memory storage** using a custom concurrent hash map
+- **Zero external dependencies** - everything built from scratch for learning
 
-### General Request Structure
+## Getting Started
 
-Every request sent to the server follows this basic structure:
+### Running the Server
 
-| Part                  | Size (bytes) | Description                                         |
-| --------------------- | ------------ | --------------------------------------------------- |
-| Request Length        | 8            | The total length of the following data (in bytes).  |
-| Request Type          | 1            | The command to execute (`0` for GET, `1` for SET).  |
-| Request Specific Data | variable     | The payload, which depends on the `Request Type`.   |
+```bash
+# Build and run the database engine
+cargo run --bin engine
+```
+
+The server listens on port `7227` by default.
+
+### Using the Python Client
+
+```bash
+# Interactive mode
+python3 client/cli.py
+
+# Direct commands
+python3 client/cli.py set mykey int 42
+python3 client/cli.py get mykey
+```
+
+## Protocol Specification
+
+CrabDB uses a custom binary protocol over TCP. All integers are sent in **big-endian** format.
+
+### Request Structure
+
+| Field           | Size (bytes) | Description                                    |
+|-----------------|--------------|------------------------------------------------|
+| Request Length  | 8            | Total length of following data                 |
+| Request Type    | 1            | Command type (`0`=GET, `1`=SET, `255`=CLOSE)  |
+| Request Data    | variable     | Command-specific payload                       |
 
 ### Commands
 
-#### `SET` Command (Request Type: `1`)
+#### GET Command (Type: `0`)
+Retrieve a value by key.
 
-The `SET` command is used to store a key-value pair.
+**Request Payload:**
+| Field      | Size (bytes) | Description           |
+|------------|-------------|-----------------------|
+| Key Length | 2           | Length of key string  |
+| Key        | variable    | UTF-8 encoded key     |
 
-**Payload Structure:**
+#### SET Command (Type: `1`)
+Store a key-value pair.
 
-| Part          | Size (bytes) | Description                                                  |
-| ------------- | ------------ | ------------------------------------------------------------ |
-| Key Length    | 2            | The length of the key string (`n`).                          |
-| Key           | `n`          | The key, encoded in UTF-8.                                   |
-| Data Type     | 1            | The type of data being stored (`0`=Null, `1`=Int, `2`=Text). |
-| Data Payload  | variable     | The actual data, structured according to its `Data Type`.    |
+**Request Payload:**
+| Field      | Size (bytes) | Description                    |
+|------------|-------------|--------------------------------|
+| Key Length | 2           | Length of key string           |
+| Key        | variable    | UTF-8 encoded key              |
+| Data Type  | 1           | Value type (`0`/`1`/`2`)       |
+| Data       | variable    | Type-specific value data       |
 
-
-#### `GET` Command (Request Type: `0`)
-
-The `GET` command is used to retrieve a value by its key.
-
-**Payload Structure:**
-
-| Part       | Size (bytes) | Description                   |
-| ---------- | ------------ | ----------------------------- |
-| Key Length | 2            | The length of the key (`n`).  |
-| Key        | `n`          | The key, encoded in UTF-8.    |
+#### CLOSE Command (Type: `255`)
+Close the connection. No payload required.
 
 ### Data Types
 
-The database supports the following data types, each with its own binary structure.
+| Type ID | Type Name | Storage Format                           |
+|---------|-----------|------------------------------------------|
+| `0`     | Null      | No data                                  |
+| `1`     | Int       | 8-byte signed integer (big-endian)      |
+| `2`     | Text      | 2-byte length + UTF-8 string data       |
 
-| Type ID | Type Name |
-| ------- | --------- |
-| `0`     | Null      |
-| `1`     | Int       |
-| `2`     | Text      |
+### Response Structure
 
-#### `Null` (Type: `0`)
+**Success Response:**
+| Field           | Size (bytes) | Description                    |
+|-----------------|--------------|--------------------------------|
+| Response Length | 8            | Total length of following data |
+| Data Type       | 1            | Type of returned value         |
+| Data            | variable     | Type-specific value data       |
 
-A null value has no data payload.
+**Error Response:**
+| Field           | Size (bytes) | Description                    |
+|-----------------|--------------|--------------------------------|
+| Response Length | 8            | Always `1` for errors          |
+| Error Code      | 1            | Always `255` (generic error)   |
 
-#### `Int` (Type: `1`)
+## Implementation Details
 
-An integer is stored as a signed 8-byte integer.
+### Type System
+The `object` crate provides a strongly-typed system where each value knows its type. Values are serialized with a type prefix, enabling type-safe deserialization.
 
-| Part   | Size (bytes) | Description            |
-| ------ | ------------ | ---------------------- |
-| Number | 8            | A signed 64-bit integer.|
+### Concurrency
+- Custom thread pool handles multiple client connections
+- Thread-safe storage using a custom concurrent hash map
+- Each connection runs in its own thread with shared storage access
 
+### Storage
+Currently implements in-memory storage only. The `Store` trait allows for pluggable storage backends (disk persistence, etc.).
 
-#### `Text` (Type: `2`)
+### Error Handling
+- Comprehensive error types for network, parsing, and object construction failures
+- Graceful connection handling with proper cleanup
 
-A text value is prefixed with its length.
+## Development Goals
 
-| Part        | Size (bytes) | Description                      |
-| ----------- | ------------ | -------------------------------- |
-| Text Length | 2            | The length of the text (`m`).    |
-| Text Data   | `m`          | The text, encoded in UTF-8.      |
+This project prioritizes:
+1. **Educational value** - Learn database internals by building from scratch
+2. **Minimal dependencies** - Custom implementations of core components
+3. **Clean architecture** - Modular design with clear separation of concerns
+4. **Type safety** - Leverage Rust's type system for correctness
 
-### General Response Structures
+## Limitations
 
-The server will respond with one of two main structures, depending on whether the operation was successful or resulted in an error. All integer values in the protocol are sent in **big-endian** format.
+- **In-memory only** - No persistence across restarts
+- **Simple protocol** - No authentication, compression, or advanced features
+- **Basic error handling** - Generic error responses
+- **No indexing** - Linear search for non-key operations
+- **Limited types** - Only Null, Int, and Text supported
 
-#### 1. Response for Successful Operations
+## Future Enhancements
 
-This structure is used when a command successfully processes and returns a value (or a null acknowledgment for `SET` operations).
+- Disk-based persistence
+- Additional data types (Boolean, Float, List, Object)
+- Query language for filtering and sorting
+- Secondary indexes
+- Compression and authentication
+- Replication and clustering
 
-| Part            | Size (bytes) | Description                                                                                                                                                                                                                         |
-| :-------------- | :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Response Length | 8            | The total length of the following data (in bytes). This will be `1` (for the `Data Type` byte) plus the length of the `Data Payload`.                                                                                              |
-| Data Type       | 1            | The type of data being returned: `0`=Null, `1`=Int, `2`=Text.                                                                                                                                                                         |
-| Data Payload    | variable     | The actual data, structured according to its `Data Type` (as defined in the "Data Types" section). For `Null` (`Data Type` `0`), there is no payload, so `Response Length` would be `1`. |
+---
 
-#### 2. Response for Errors
-
-This structure is used when a command encounters an error. It's a fixed, simple error indicator.
-
-| Part            | Size (bytes) | Description                                         |
-| :-------------- | :----------- | :-------------------------------------------------- |
-| Response Length | 8            | The total length of the following data (in bytes). **This will always be `1` for an error response.** |
-| Error Indicator | 1            | A single byte with the value `255`, signifying an error. |
+*CrabDB is a learning project focused on understanding database fundamentals. It's not intended for production use.*

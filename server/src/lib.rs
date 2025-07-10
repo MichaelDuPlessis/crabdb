@@ -136,7 +136,10 @@ impl Command {
     fn new_set(data: Vec<u8>) -> Result<Self, ObjectError> {
         // first extract Key
         let (key, data) = Key::new(data.as_slice())?;
-        Ok(Self::Set(key, Object::deserialize(data)?))
+        Ok(Self::Set(
+            key,
+            Object::deserialize(data).map(|(obj, _)| obj)?,
+        ))
     }
 
     /// Creates a new Delete command

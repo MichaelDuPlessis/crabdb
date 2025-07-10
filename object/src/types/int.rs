@@ -1,4 +1,4 @@
-use crate::ObjectError;
+use crate::{Object, ObjectError};
 
 use super::type_ids::{INT_TYPE_ID, TYPE_ID_NUM_BYTES};
 
@@ -43,5 +43,11 @@ impl Int {
 
             Ok((Self(interal), &bytes[INTERNAL_INT_SIZE..]))
         }
+    }
+}
+
+impl From<Int> for Object {
+    fn from(value: Int) -> Self {
+        Self::Int(value)
     }
 }

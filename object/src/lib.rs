@@ -2,6 +2,7 @@ use core::error;
 use std::fmt;
 use types::{
     int::Int,
+    list::List,
     null::Null,
     text::Text,
     type_ids::{self, TYPE_ID_NUM_BYTES, TypeId},
@@ -64,6 +65,8 @@ pub enum Object {
     Int(Int),
     /// A text (string) object
     Text(Text),
+    /// A list of objects
+    List(List),
 }
 
 impl Object {
@@ -74,11 +77,12 @@ impl Object {
             Object::Null(null) => null.serialize(),
             Object::Int(int) => int.serialize(),
             Object::Text(text) => text.serialize(),
+            Object::List(list) => list.serialize(),
         }
     }
 
     /// Create an Object from raw bytes
-    pub fn deserialize(bytes: &[u8]) -> Result<Self, ObjectError> {
+    pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError> {
         // First extract the TypeId
         let mut buffer = [0; TYPE_ID_NUM_BYTES];
         buffer.copy_from_slice(&bytes[..TYPE_ID_NUM_BYTES]);
@@ -90,12 +94,17 @@ impl Object {
         match type_id {
             // Null
             type_ids::NULL_TYPE_ID => {
-                Null::deserialize(bytes).map(|(object, _)| Self::Null(object))
+                Null::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
             }
             // Int
-            type_ids::INT_TYPE_ID => Int::deserialize(bytes).map(|(object, _)| Self::Int(object)),
+            type_ids::INT_TYPE_ID => {
+                Int::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
+            }
             type_ids::TEXT_TYPE_ID => {
-                Text::deserialize(bytes).map(|(object, _)| Self::Text(object))
+                Text::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
+            }
+            type_ids::LIST_TYPE_ID => {
+                List::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
             }
             // if there is no valid type then return an error
             _ => Err(ObjectError),

@@ -1,4 +1,5 @@
 pub mod int;
+pub mod list;
 pub mod null;
 pub mod text;
 
@@ -14,4 +15,6 @@ pub mod type_ids {
     pub const INT_TYPE_ID: TypeId = 1;
     /// The TypeId for Text
     pub const TEXT_TYPE_ID: TypeId = 2;
+    /// The TypeId for Text
+    pub const LIST_TYPE_ID: TypeId = 3;
 }

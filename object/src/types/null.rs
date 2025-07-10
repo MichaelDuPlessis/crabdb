@@ -1,4 +1,4 @@
-use crate::{ObjectError, types::type_ids::NULL_TYPE_ID};
+use crate::{Object, ObjectError, types::type_ids::NULL_TYPE_ID};
 /// This represents a null object in the database
 /// so just no value
 #[derive(Debug, Clone)]
@@ -11,5 +11,11 @@ impl Null {
 
     pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError> {
         Ok((Self, bytes))
+    }
+}
+
+impl From<Null> for Object {
+    fn from(value: Null) -> Self {
+        Self::Null(value)
     }
 }

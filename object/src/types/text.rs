@@ -1,6 +1,5 @@
-use crate::ObjectError;
-
 use super::type_ids::{TEXT_TYPE_ID, TYPE_ID_NUM_BYTES};
+use crate::{Object, ObjectError};
 
 /// The data type used to store the length of Text in the payload
 type TextLen = u16;
@@ -8,6 +7,7 @@ type TextLen = u16;
 const TEXT_LEN_NUM_BYTES: usize = std::mem::size_of::<TextLen>();
 
 /// Represents a piece of text in the database
+/// The validity of the bytes that make up the text are not verified
 #[derive(Debug, Clone)]
 pub struct Text(Box<[u8]>);
 
@@ -52,5 +52,11 @@ impl Text {
                 Ok((Self(text), &bytes[text_len..]))
             }
         }
+    }
+}
+
+impl From<Text> for Object {
+    fn from(value: Text) -> Self {
+        Self::Text(value)
     }
 }

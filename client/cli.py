@@ -491,10 +491,67 @@ def main():
         print("\nTip: Use '--interactive' or '-i' to enter interactive mode.")
 
 
+def _serialize_object(value):
+    """
+    Serialize a single JSON value to CrabDB object format.
+    Handles null, int, string, list, and map (dict) values recursively.
+    """
+    if value is None:
+        # Serialize null
+        return struct.pack('>B', TYPE_NULL)
+    elif isinstance(value, int):
+        # Serialize int
+        return struct.pack('>B', TYPE_INT) + struct.pack('>q', value)
+    elif isinstance(value, str):
+        # Serialize text
+        text_bytes = value.encode('utf-8')
+        return (
+            struct.pack('>B', TYPE_TEXT) + 
+            struct.pack('>H', len(text_bytes)) + 
+            text_bytes
+        )
+    elif isinstance(value, list):
+        # Serialize list recursively
+        serialized_objects = []
+        for item in value:
+            serialized_objects.append(_serialize_object(item))
+        
+        serialized_data = b''.join(serialized_objects)
+        return (
+            struct.pack('>B', TYPE_LIST) + 
+            struct.pack('>H', len(value)) + 
+            serialized_data
+        )
+    elif isinstance(value, dict):
+        # Serialize map recursively
+        serialized_fields = []
+        for key, val in value.items():
+            if not isinstance(key, str):
+                raise ValueError("Map keys must be strings")
+            
+            # Serialize field name
+            key_bytes = key.encode('utf-8')
+            field_data = struct.pack('>H', len(key_bytes)) + key_bytes
+            
+            # Serialize field value recursively
+            field_data += _serialize_object(val)
+            
+            serialized_fields.append(field_data)
+        
+        serialized_data = b''.join(serialized_fields)
+        return (
+            struct.pack('>B', TYPE_MAP) + 
+            struct.pack('>H', len(value)) + 
+            serialized_data
+        )
+    else:
+        raise ValueError(f"Unsupported JSON value type: {type(value)}")
+
+
 def _serialize_list(value_str):
     """
     Serialize a list from JSON-like string format.
-    Simple format: [int:42, text:hello, null]
+    Supports nested structures: [1, "hello", null, [1, 2], {"key": "value"}]
     """
     import json
     try:
@@ -505,22 +562,7 @@ def _serialize_list(value_str):
         
         serialized_objects = []
         for item in items:
-            if item is None:
-                # Serialize null
-                serialized_objects.append(struct.pack('>B', TYPE_NULL))
-            elif isinstance(item, int):
-                # Serialize int
-                serialized_objects.append(struct.pack('>B', TYPE_INT) + struct.pack('>q', item))
-            elif isinstance(item, str):
-                # Serialize text
-                text_bytes = item.encode('utf-8')
-                serialized_objects.append(
-                    struct.pack('>B', TYPE_TEXT) + 
-                    struct.pack('>H', len(text_bytes)) + 
-                    text_bytes
-                )
-            else:
-                raise ValueError(f"Unsupported list item type: {type(item)}")
+            serialized_objects.append(_serialize_object(item))
         
         # Combine all serialized objects
         serialized_data = b''.join(serialized_objects)
@@ -535,7 +577,7 @@ def _serialize_list(value_str):
 def _serialize_map(value_str):
     """
     Serialize a map from JSON-like string format.
-    Format: {"key1": value1, "key2": value2}
+    Supports nested structures: {"key1": value1, "nested": {"inner": "value"}, "list": [1, 2, 3]}
     """
     import json
     try:
@@ -553,20 +595,8 @@ def _serialize_map(value_str):
             key_bytes = key.encode('utf-8')
             field_data = struct.pack('>H', len(key_bytes)) + key_bytes
             
-            # Serialize field value
-            if value is None:
-                field_data += struct.pack('>B', TYPE_NULL)
-            elif isinstance(value, int):
-                field_data += struct.pack('>B', TYPE_INT) + struct.pack('>q', value)
-            elif isinstance(value, str):
-                text_bytes = value.encode('utf-8')
-                field_data += (
-                    struct.pack('>B', TYPE_TEXT) + 
-                    struct.pack('>H', len(text_bytes)) + 
-                    text_bytes
-                )
-            else:
-                raise ValueError(f"Unsupported map value type: {type(value)}")
+            # Serialize field value using the generic object serializer
+            field_data += _serialize_object(value)
             
             serialized_fields.append(field_data)
         
@@ -580,43 +610,67 @@ def _serialize_map(value_str):
         raise ValueError("Map value must be valid JSON object format")
 
 
+def _deserialize_object(data, cursor):
+    """
+    Deserialize a single object from binary data.
+    Handles all CrabDB types recursively: null, int, text, list, map.
+    Returns (value, new_cursor_position).
+    """
+    if cursor >= len(data):
+        raise ValueError("Incomplete object data")
+    
+    # Read type ID
+    type_id = data[cursor]
+    cursor += 1
+    
+    if type_id == TYPE_NULL:
+        return None, cursor
+    elif type_id == TYPE_INT:
+        if cursor + 8 > len(data):
+            raise ValueError("Incomplete int data")
+        value = struct.unpack('>q', data[cursor:cursor+8])[0]
+        return value, cursor + 8
+    elif type_id == TYPE_TEXT:
+        if cursor + 2 > len(data):
+            raise ValueError("Incomplete text length")
+        text_len = struct.unpack('>H', data[cursor:cursor+2])[0]
+        cursor += 2
+        if cursor + text_len > len(data):
+            raise ValueError("Incomplete text data")
+        text_value = data[cursor:cursor+text_len].decode('utf-8')
+        return text_value, cursor + text_len
+    elif type_id == TYPE_LIST:
+        if cursor + 2 > len(data):
+            raise ValueError("Incomplete list count")
+        list_count = struct.unpack('>H', data[cursor:cursor+2])[0]
+        cursor += 2
+        return _deserialize_list(data, cursor, list_count)
+    elif type_id == TYPE_MAP:
+        if cursor + 2 > len(data):
+            raise ValueError("Incomplete map field count")
+        field_count = struct.unpack('>H', data[cursor:cursor+2])[0]
+        cursor += 2
+        return _deserialize_map(data, cursor, field_count)
+    else:
+        raise ValueError(f"Unsupported type ID: {type_id}")
+
+
 def _deserialize_list(data, cursor, count):
-    """Deserialize a list from binary data."""
+    """Deserialize a list from binary data, supporting nested structures."""
     items = []
     for _ in range(count):
         if cursor >= len(data):
             raise ValueError("Incomplete list data")
         
-        # Read type ID
-        type_id = data[cursor]
-        cursor += 1
-        
-        if type_id == TYPE_NULL:
-            items.append(None)
-        elif type_id == TYPE_INT:
-            if cursor + 8 > len(data):
-                raise ValueError("Incomplete int data in list")
-            value = struct.unpack('>q', data[cursor:cursor+8])[0]
-            items.append(value)
-            cursor += 8
-        elif type_id == TYPE_TEXT:
-            if cursor + 2 > len(data):
-                raise ValueError("Incomplete text length in list")
-            text_len = struct.unpack('>H', data[cursor:cursor+2])[0]
-            cursor += 2
-            if cursor + text_len > len(data):
-                raise ValueError("Incomplete text data in list")
-            text_value = data[cursor:cursor+text_len].decode('utf-8')
-            items.append(text_value)
-            cursor += text_len
-        else:
-            raise ValueError(f"Unsupported type in list: {type_id}")
+        # Deserialize object recursively
+        obj, cursor = _deserialize_object(data, cursor)
+        items.append(obj)
     
     return items, cursor
 
 
 def _deserialize_map(data, cursor, field_count):
-    """Deserialize a map from binary data."""
+    """Deserialize a map from binary data, supporting nested structures."""
     fields = {}
     for _ in range(field_count):
         if cursor + 2 > len(data):
@@ -632,33 +686,9 @@ def _deserialize_map(data, cursor, field_count):
         field_name = data[cursor:cursor+name_len].decode('utf-8')
         cursor += name_len
         
-        # Read field value type
-        if cursor >= len(data):
-            raise ValueError("Incomplete field value type in map")
-        type_id = data[cursor]
-        cursor += 1
-        
-        # Read field value
-        if type_id == TYPE_NULL:
-            fields[field_name] = None
-        elif type_id == TYPE_INT:
-            if cursor + 8 > len(data):
-                raise ValueError("Incomplete int data in map")
-            value = struct.unpack('>q', data[cursor:cursor+8])[0]
-            fields[field_name] = value
-            cursor += 8
-        elif type_id == TYPE_TEXT:
-            if cursor + 2 > len(data):
-                raise ValueError("Incomplete text length in map")
-            text_len = struct.unpack('>H', data[cursor:cursor+2])[0]
-            cursor += 2
-            if cursor + text_len > len(data):
-                raise ValueError("Incomplete text data in map")
-            text_value = data[cursor:cursor+text_len].decode('utf-8')
-            fields[field_name] = text_value
-            cursor += text_len
-        else:
-            raise ValueError(f"Unsupported type in map: {type_id}")
+        # Deserialize field value recursively
+        value, cursor = _deserialize_object(data, cursor)
+        fields[field_name] = value
     
     return fields, cursor
 

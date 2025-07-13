@@ -45,15 +45,19 @@ python3 client/cli.py set mykey int 42
 python3 client/cli.py set mytext text "hello world"
 python3 client/cli.py set mylist list '[1, "hello", null]'
 python3 client/cli.py set mymap map '{"name": "John", "age": 30, "active": null}'
+python3 client/cli.py set nested map '{"user": {"name": "Alice", "scores": [95, 87, 92]}, "meta": {"created": "2024-01-01"}}'
+python3 client/cli.py set complex list '[{"id": 1, "tags": ["red", "blue"]}, {"id": 2, "tags": ["green"]}]'
 python3 client/cli.py get mykey
 python3 client/cli.py get mylist
 python3 client/cli.py get mymap
+python3 client/cli.py get nested
 python3 client/cli.py del mykey
 ```
 
 **Note**: List and Map values use JSON format:
 - **Lists**: `'[1, "hello", null]'` - JSON array with mixed types
 - **Maps**: `'{"name": "John", "age": 30, "active": null}'` - JSON object with string keys
+- **Nested structures**: Full nesting support - Lists can contain Maps, Maps can contain Lists, etc.
 
 ## Protocol Specification
 

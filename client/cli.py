@@ -12,6 +12,8 @@ import shlex  # For splitting input lines in interactive mode
 TYPE_NULL = 0
 TYPE_INT = 1
 TYPE_TEXT = 2
+TYPE_LIST = 3
+TYPE_MAP = 4
 
 REQUEST_GET = 0
 REQUEST_SET = 1
@@ -21,6 +23,8 @@ DATA_TYPE_MAP = {
     "int": TYPE_INT,
     "text": TYPE_TEXT,
     "null": TYPE_NULL,
+    "list": TYPE_LIST,
+    "map": TYPE_MAP,
 }
 
 
@@ -146,8 +150,26 @@ def parse_server_response(response_data_content, declared_len):
         text_value = response_data_content[cursor:cursor +
                                            text_len].decode('utf-8')
         return f"Result (Text): '{text_value}'"
+    elif data_type == TYPE_LIST:
+        # List payload has a 2-byte count prefix + serialized objects
+        if len(response_data_content) < cursor + 2:
+            return f"ERROR: Incomplete LIST count. Received {len(response_data_content) - cursor} bytes, expected 2."
+        list_count = struct.unpack('>H', response_data_content[cursor:cursor+2])[0]
+        cursor += 2
+        
+        result, _ = _deserialize_list(response_data_content, cursor, list_count)
+        return f"Result (List): {result}"
+    elif data_type == TYPE_MAP:
+        # Map payload has a 2-byte field count prefix + field entries
+        if len(response_data_content) < cursor + 2:
+            return f"ERROR: Incomplete MAP field count. Received {len(response_data_content) - cursor} bytes, expected 2."
+        field_count = struct.unpack('>H', response_data_content[cursor:cursor+2])[0]
+        cursor += 2
+        
+        result, _ = _deserialize_map(response_data_content, cursor, field_count)
+        return f"Result (Map): {result}"
     else:
-        return f"ERROR: Unknown Data Type received in successful response: {data_type} (Expected 0, 1, or 2)."
+        return f"ERROR: Unknown Data Type received in successful response: {data_type} (Expected 0, 1, 2, 3, or 4)."
 
 
 def construct_set_payload(key, value_str, value_type):
@@ -173,6 +195,12 @@ def construct_set_payload(key, value_str, value_type):
     elif value_type == TYPE_NULL:
         # Null has no data payload
         pass
+    elif value_type == TYPE_LIST:
+        # Parse JSON-like list format: [item1, item2, ...]
+        data_payload = _serialize_list(value_str)
+    elif value_type == TYPE_MAP:
+        # Parse JSON-like map format: {"key1": value1, "key2": value2}
+        data_payload = _serialize_map(value_str)
     else:
         raise ValueError(f"Unsupported data type for SET: {value_type}")
 
@@ -461,6 +489,178 @@ def main():
         # print usage and suggest interactive mode.
         parser.print_help()
         print("\nTip: Use '--interactive' or '-i' to enter interactive mode.")
+
+
+def _serialize_list(value_str):
+    """
+    Serialize a list from JSON-like string format.
+    Simple format: [int:42, text:hello, null]
+    """
+    import json
+    try:
+        # Parse as JSON array
+        items = json.loads(value_str)
+        if not isinstance(items, list):
+            raise ValueError("List value must be a JSON array")
+        
+        serialized_objects = []
+        for item in items:
+            if item is None:
+                # Serialize null
+                serialized_objects.append(struct.pack('>B', TYPE_NULL))
+            elif isinstance(item, int):
+                # Serialize int
+                serialized_objects.append(struct.pack('>B', TYPE_INT) + struct.pack('>q', item))
+            elif isinstance(item, str):
+                # Serialize text
+                text_bytes = item.encode('utf-8')
+                serialized_objects.append(
+                    struct.pack('>B', TYPE_TEXT) + 
+                    struct.pack('>H', len(text_bytes)) + 
+                    text_bytes
+                )
+            else:
+                raise ValueError(f"Unsupported list item type: {type(item)}")
+        
+        # Combine all serialized objects
+        serialized_data = b''.join(serialized_objects)
+        
+        # Return count + data
+        return struct.pack('>H', len(items)) + serialized_data
+        
+    except json.JSONDecodeError:
+        raise ValueError("List value must be valid JSON array format")
+
+
+def _serialize_map(value_str):
+    """
+    Serialize a map from JSON-like string format.
+    Format: {"key1": value1, "key2": value2}
+    """
+    import json
+    try:
+        # Parse as JSON object
+        obj = json.loads(value_str)
+        if not isinstance(obj, dict):
+            raise ValueError("Map value must be a JSON object")
+        
+        serialized_fields = []
+        for key, value in obj.items():
+            if not isinstance(key, str):
+                raise ValueError("Map keys must be strings")
+            
+            # Serialize field name
+            key_bytes = key.encode('utf-8')
+            field_data = struct.pack('>H', len(key_bytes)) + key_bytes
+            
+            # Serialize field value
+            if value is None:
+                field_data += struct.pack('>B', TYPE_NULL)
+            elif isinstance(value, int):
+                field_data += struct.pack('>B', TYPE_INT) + struct.pack('>q', value)
+            elif isinstance(value, str):
+                text_bytes = value.encode('utf-8')
+                field_data += (
+                    struct.pack('>B', TYPE_TEXT) + 
+                    struct.pack('>H', len(text_bytes)) + 
+                    text_bytes
+                )
+            else:
+                raise ValueError(f"Unsupported map value type: {type(value)}")
+            
+            serialized_fields.append(field_data)
+        
+        # Combine all serialized fields
+        serialized_data = b''.join(serialized_fields)
+        
+        # Return field count + data
+        return struct.pack('>H', len(obj)) + serialized_data
+        
+    except json.JSONDecodeError:
+        raise ValueError("Map value must be valid JSON object format")
+
+
+def _deserialize_list(data, cursor, count):
+    """Deserialize a list from binary data."""
+    items = []
+    for _ in range(count):
+        if cursor >= len(data):
+            raise ValueError("Incomplete list data")
+        
+        # Read type ID
+        type_id = data[cursor]
+        cursor += 1
+        
+        if type_id == TYPE_NULL:
+            items.append(None)
+        elif type_id == TYPE_INT:
+            if cursor + 8 > len(data):
+                raise ValueError("Incomplete int data in list")
+            value = struct.unpack('>q', data[cursor:cursor+8])[0]
+            items.append(value)
+            cursor += 8
+        elif type_id == TYPE_TEXT:
+            if cursor + 2 > len(data):
+                raise ValueError("Incomplete text length in list")
+            text_len = struct.unpack('>H', data[cursor:cursor+2])[0]
+            cursor += 2
+            if cursor + text_len > len(data):
+                raise ValueError("Incomplete text data in list")
+            text_value = data[cursor:cursor+text_len].decode('utf-8')
+            items.append(text_value)
+            cursor += text_len
+        else:
+            raise ValueError(f"Unsupported type in list: {type_id}")
+    
+    return items, cursor
+
+
+def _deserialize_map(data, cursor, field_count):
+    """Deserialize a map from binary data."""
+    fields = {}
+    for _ in range(field_count):
+        if cursor + 2 > len(data):
+            raise ValueError("Incomplete field name length in map")
+        
+        # Read field name length
+        name_len = struct.unpack('>H', data[cursor:cursor+2])[0]
+        cursor += 2
+        
+        # Read field name
+        if cursor + name_len > len(data):
+            raise ValueError("Incomplete field name in map")
+        field_name = data[cursor:cursor+name_len].decode('utf-8')
+        cursor += name_len
+        
+        # Read field value type
+        if cursor >= len(data):
+            raise ValueError("Incomplete field value type in map")
+        type_id = data[cursor]
+        cursor += 1
+        
+        # Read field value
+        if type_id == TYPE_NULL:
+            fields[field_name] = None
+        elif type_id == TYPE_INT:
+            if cursor + 8 > len(data):
+                raise ValueError("Incomplete int data in map")
+            value = struct.unpack('>q', data[cursor:cursor+8])[0]
+            fields[field_name] = value
+            cursor += 8
+        elif type_id == TYPE_TEXT:
+            if cursor + 2 > len(data):
+                raise ValueError("Incomplete text length in map")
+            text_len = struct.unpack('>H', data[cursor:cursor+2])[0]
+            cursor += 2
+            if cursor + text_len > len(data):
+                raise ValueError("Incomplete text data in map")
+            text_value = data[cursor:cursor+text_len].decode('utf-8')
+            fields[field_name] = text_value
+            cursor += text_len
+        else:
+            raise ValueError(f"Unsupported type in map: {type_id}")
+    
+    return fields, cursor
 
 
 if __name__ == '__main__':

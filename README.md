@@ -19,7 +19,7 @@ CrabDB is built as a modular Rust workspace with the following components:
 
 - **TCP-based protocol** with binary serialization
 - **Concurrent connections** using a custom thread pool
-- **Type-safe data storage** with Null, Int (i64), and Text types
+- **Type-safe data storage** with Null, Int (i64), Text, List, and Map types
 - **Thread-safe in-memory storage** using a custom concurrent hash map
 - **Zero external dependencies** - everything built from scratch for learning
 
@@ -42,9 +42,18 @@ python3 client/cli.py
 
 # Direct commands
 python3 client/cli.py set mykey int 42
+python3 client/cli.py set mytext text "hello world"
+python3 client/cli.py set mylist list '[1, "hello", null]'
+python3 client/cli.py set mymap map '{"name": "John", "age": 30, "active": null}'
 python3 client/cli.py get mykey
+python3 client/cli.py get mylist
+python3 client/cli.py get mymap
 python3 client/cli.py del mykey
 ```
+
+**Note**: List and Map values use JSON format:
+- **Lists**: `'[1, "hello", null]'` - JSON array with mixed types
+- **Maps**: `'{"name": "John", "age": 30, "active": null}'` - JSON object with string keys
 
 ## Protocol Specification
 
@@ -77,7 +86,7 @@ Store a key-value pair.
 |------------|-------------|--------------------------------|
 | Key Length | 2           | Length of key string           |
 | Key        | variable    | UTF-8 encoded key              |
-| Data Type  | 1           | Value type (`0`/`1`/`2`)       |
+| Data Type  | 1           | Value type (`0`/`1`/`2`/`3`/`4`) |
 | Data       | variable    | Type-specific value data       |
 
 #### DELETE Command (Type: `2`)
@@ -99,6 +108,27 @@ Close the connection. No payload required.
 | `0`     | Null      | No data                                  |
 | `1`     | Int       | 8-byte signed integer (big-endian)      |
 | `2`     | Text      | 2-byte length + UTF-8 string data       |
+| `3`     | List      | 2-byte count + serialized objects       |
+| `4`     | Map       | 2-byte field count + field entries      |
+
+#### List Format (Type ID: `3`)
+| Field        | Size (bytes) | Description                    |
+|--------------|--------------|--------------------------------|
+| Object Count | 2            | Number of objects in the list  |
+| Objects      | variable     | Serialized objects in sequence |
+
+#### Map Format (Type ID: `4`)
+| Field       | Size (bytes) | Description                     |
+|-------------|-------------|---------------------------------|
+| Field Count | 2           | Number of key-value pairs       |
+| Fields      | variable    | Field entries in sequence       |
+
+**Field Entry Format:**
+| Field           | Size (bytes) | Description                    |
+|-----------------|--------------|--------------------------------|
+| Field Name Len  | 2            | Length of field name           |
+| Field Name      | variable     | UTF-8 encoded field name       |
+| Object          | variable     | Serialized object value        |
 
 ### Response Structure
 

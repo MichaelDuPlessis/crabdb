@@ -3,6 +3,7 @@ use std::fmt;
 use types::{
     int::Int,
     list::List,
+    map::Map,
     null::Null,
     text::Text,
     type_ids::{self, TYPE_ID_NUM_BYTES, TypeId},
@@ -67,6 +68,8 @@ pub enum Object {
     Text(Text),
     /// A list of objects
     List(List),
+    /// A map (mapping of string keys to objects)
+    Map(Map),
 }
 
 impl Object {
@@ -78,6 +81,7 @@ impl Object {
             Object::Int(int) => int.serialize(),
             Object::Text(text) => text.serialize(),
             Object::List(list) => list.serialize(),
+            Object::Map(map) => map.serialize(),
         }
     }
 
@@ -105,6 +109,9 @@ impl Object {
             }
             type_ids::LIST_TYPE_ID => {
                 List::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
+            }
+            type_ids::MAP_TYPE_ID => {
+                Map::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
             }
             // if there is no valid type then return an error
             _ => Err(ObjectError),

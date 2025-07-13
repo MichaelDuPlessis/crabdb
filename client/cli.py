@@ -7,6 +7,7 @@ import struct
 import argparse
 import sys
 import shlex  # For splitting input lines in interactive mode
+import signal  # For handling Ctrl+C
 
 # Define constants for data types and request types as per the protocol.
 TYPE_NULL = 0
@@ -17,6 +18,8 @@ TYPE_MAP = 4
 
 REQUEST_GET = 0
 REQUEST_SET = 1
+REQUEST_DELETE = 2
+REQUEST_CLOSE = 255
 
 # Define a mapping from string names to type codes for user input.
 DATA_TYPE_MAP = {
@@ -235,6 +238,50 @@ def construct_get_payload(key):
     return total_len_bytes + request_type_byte + request_specific_part
 
 
+def construct_close_payload():
+    """
+    Constructs the binary payload for a CLOSE request.
+    The CLOSE command has no additional data, just the command type.
+    """
+    # --- Assemble the full payload ---
+    request_type_byte = struct.pack('>B', REQUEST_CLOSE)
+    # The total length is just the length of the command type byte
+    total_len = len(request_type_byte)
+    total_len_bytes = struct.pack('>Q', total_len)
+
+    return total_len_bytes + request_type_byte
+
+
+def send_close_request(sock):
+    """
+    Send a close request to the server and handle the response.
+    Returns True if successful, False otherwise.
+    """
+    try:
+        close_payload = construct_close_payload()
+        sock.send(close_payload)
+        print("Close request sent to server.")
+        
+        # The server should close the connection after receiving CLOSE
+        # We don't expect a response, but we'll try to read to see if connection closes
+        try:
+            response = sock.recv(1024)
+            if not response:
+                print("Server closed the connection gracefully.")
+                return True
+            else:
+                print("Server sent unexpected response to close request.")
+                return True
+        except socket.error:
+            # Connection closed by server, which is expected
+            print("Server closed the connection.")
+            return True
+            
+    except socket.error as e:
+        print(f"Error sending close request: {e}")
+        return False
+
+
 def interactive_mode(initial_host, initial_port):
     """
     Runs the CLI client in interactive mode, keeping the database connection open.
@@ -275,9 +322,25 @@ def interactive_mode(initial_host, initial_port):
     if not establish_connection():
         print("Starting interactive mode without an active connection. Use 'connect' to establish one.")
 
+    # Set up signal handler for graceful shutdown on Ctrl+C
+    def signal_handler(signum, frame):
+        print("\n\nReceived interrupt signal (Ctrl+C)")
+        if db_socket:
+            print("Sending close request to server...")
+            send_close_request(db_socket)
+            try:
+                db_socket.close()
+            except:
+                pass
+        print("Exiting interactive mode.")
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+
     print("\nEntering interactive mode.")
-    print("Commands: set <key> <value> --type <int|text|null> | get <key> | connect <host>:<port> | exit | quit")
+    print("Commands: set <key> <value> --type <int|text|list|map> | get <key> | close | connect <host>:<port> | exit | quit")
     print("Quote values with spaces, e.g., set \"my key\" \"my value\" --type text")
+    print("Press Ctrl+C to send close request and exit gracefully.")
 
     try:
         while True:
@@ -293,6 +356,9 @@ def interactive_mode(initial_host, initial_port):
                 command = parts[0].lower()
 
                 if command in ['exit', 'quit']:
+                    if db_socket:
+                        print("Sending close request to server...")
+                        send_close_request(db_socket)
                     print("Exiting interactive mode.")
                     break
                 elif command == 'connect':
@@ -389,6 +455,22 @@ def interactive_mode(initial_host, initial_port):
                     print("--- Server Response ---")
                     print(response)
 
+                elif command == 'close':
+                    if db_socket is None:
+                        print("Error: Not connected to the database.")
+                        continue
+                    
+                    print("Sending close request to server...")
+                    if send_close_request(db_socket):
+                        try:
+                            db_socket.close()
+                        except:
+                            pass
+                        db_socket = None
+                        print("Connection closed.")
+                    else:
+                        print("Failed to send close request properly.")
+
                 else:
                     print(f"Unknown command: '{command}'.")
 
@@ -401,6 +483,8 @@ def interactive_mode(initial_host, initial_port):
         # Ensure the socket is closed when interactive mode exits for any reason
         if db_socket:
             try:
+                print("Sending close request to server before exit...")
+                send_close_request(db_socket)
                 db_socket.close()
                 print("Database connection closed.")
             except socket.error as e:
@@ -445,6 +529,10 @@ def main():
         'get', help='Get a value by its key from the database.')
     parser_get.add_argument('key', help='The key to retrieve.')
 
+    # --- Parser for the "close" command ---
+    parser_close = subparsers.add_parser(
+        'close', help='Send a close/shutdown request to the server.')
+
     args = parser.parse_args()
 
     if args.interactive:
@@ -469,6 +557,9 @@ def main():
             elif args.command == 'get':
                 print(f"Executing GET: key='{args.key}'")
                 payload = construct_get_payload(args.key)
+            elif args.command == 'close':
+                print("Executing CLOSE: sending shutdown request to server")
+                payload = construct_close_payload()
 
             if payload:
                 print(f"Sending {len(payload)} bytes to {

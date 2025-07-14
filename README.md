@@ -51,6 +51,7 @@ python3 client/cli.py get mykey
 python3 client/cli.py get mylist
 python3 client/cli.py get mymap
 python3 client/cli.py get nested
+python3 client/cli.py close
 python3 client/cli.py del mykey
 ```
 
@@ -58,6 +59,12 @@ python3 client/cli.py del mykey
 - **Lists**: `'[1, "hello", null]'` - JSON array with mixed types
 - **Maps**: `'{"name": "John", "age": 30, "active": null}'` - JSON object with string keys
 - **Nested structures**: Full nesting support - Lists can contain Maps, Maps can contain Lists, etc.
+
+**Interactive Mode**: 
+- Use `python3 client/cli.py --interactive` for persistent connections
+- Press **Ctrl+C** to gracefully send a close request and exit
+- Use `close` command to send shutdown request to server
+- Use `exit` or `quit` to close the client (also sends close request if connected)
 
 ## Protocol Specification
 

@@ -19,6 +19,7 @@ TYPE_MAP = 4
 REQUEST_GET = 0
 REQUEST_SET = 1
 REQUEST_DELETE = 2
+REQUEST_UPDATED_TIME = 3
 REQUEST_CLOSE = 255
 
 # Define a mapping from string names to type codes for user input.
@@ -238,6 +239,42 @@ def construct_get_payload(key):
     return total_len_bytes + request_type_byte + request_specific_part
 
 
+def construct_updated_time_payload(key):
+    """
+    Constructs the binary payload for an UPDATED_TIME request.
+    """
+    key_bytes = key.encode('utf-8')
+
+    # --- Assemble the request-specific part ---
+    request_specific_part = struct.pack('>H', len(key_bytes)) + key_bytes
+
+    # --- Assemble the full payload ---
+    request_type_byte = struct.pack('>B', REQUEST_UPDATED_TIME)
+    # The total length is the length of everything *after* the initial 8-byte length field.
+    total_len = len(request_type_byte) + len(request_specific_part)
+    total_len_bytes = struct.pack('>Q', total_len)
+
+    return total_len_bytes + request_type_byte + request_specific_part
+
+
+def construct_updated_time_payload(key):
+    """
+    Constructs the binary payload for an UPDATED_TIME request.
+    """
+    key_bytes = key.encode('utf-8')
+
+    # --- Assemble the request-specific part ---
+    request_specific_part = struct.pack('>H', len(key_bytes)) + key_bytes
+
+    # --- Assemble the full payload ---
+    request_type_byte = struct.pack('>B', REQUEST_UPDATED_TIME)
+    # The total length is the length of everything *after* the initial 8-byte length field.
+    total_len = len(request_type_byte) + len(request_specific_part)
+    total_len_bytes = struct.pack('>Q', total_len)
+
+    return total_len_bytes + request_type_byte + request_specific_part
+
+
 def construct_close_payload():
     """
     Constructs the binary payload for a CLOSE request.
@@ -338,7 +375,7 @@ def interactive_mode(initial_host, initial_port):
     signal.signal(signal.SIGINT, signal_handler)
 
     print("\nEntering interactive mode.")
-    print("Commands: set <key> <value> --type <int|text|list|map> | get <key> | close | connect <host>:<port> | exit | quit")
+    print("Commands: set <key> <value> --type <int|text|list|map> | get <key> | updated_time <key> | close | connect <host>:<port> | exit | quit")
     print("Quote values with spaces, e.g., set \"my key\" \"my value\" --type text")
     print("Press Ctrl+C to send close request and exit gracefully.")
 
@@ -455,6 +492,23 @@ def interactive_mode(initial_host, initial_port):
                     print("--- Server Response ---")
                     print(response)
 
+                elif command == 'updated_time':
+                    if db_socket is None:
+                        print(
+                            "Error: Not connected to the database. Use 'connect' first.")
+                        continue
+
+                    if len(parts) != 2:
+                        print("Usage: updated_time <key>")
+                        continue
+
+                    key = parts[1]
+                    payload = construct_updated_time_payload(key)
+                    print(f"Sending UPDATED_TIME request for key='{key}'...")
+                    response = execute_command_on_socket(db_socket, payload)
+                    print("--- Server Response ---")
+                    print(response)
+
                 elif command == 'close':
                     if db_socket is None:
                         print("Error: Not connected to the database.")
@@ -529,6 +583,11 @@ def main():
         'get', help='Get a value by its key from the database.')
     parser_get.add_argument('key', help='The key to retrieve.')
 
+    # --- Parser for the "updated_time" command ---
+    parser_updated_time = subparsers.add_parser(
+        'updated_time', help='Get the updated timestamp for a key from the database.')
+    parser_updated_time.add_argument('key', help='The key to get the timestamp for.')
+
     # --- Parser for the "close" command ---
     parser_close = subparsers.add_parser(
         'close', help='Send a close/shutdown request to the server.')
@@ -557,6 +616,9 @@ def main():
             elif args.command == 'get':
                 print(f"Executing GET: key='{args.key}'")
                 payload = construct_get_payload(args.key)
+            elif args.command == 'updated_time':
+                print(f"Executing UPDATED_TIME: key='{args.key}'")
+                payload = construct_updated_time_payload(args.key)
             elif args.command == 'close':
                 print("Executing CLOSE: sending shutdown request to server")
                 payload = construct_close_payload()

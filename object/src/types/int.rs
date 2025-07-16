@@ -13,6 +13,11 @@ const INTERNAL_INT_SIZE: usize = std::mem::size_of::<InternalInt>();
 pub struct Int(InternalInt);
 
 impl Int {
+    /// Create a new Int from a value that can be converted to InternalInt
+    pub fn new(value: impl Into<InternalInt>) -> Self {
+        Self(value.into())
+    }
+
     pub fn serialize(&self) -> Vec<u8> {
         // converting to bytes
         let bytes = self.0.to_be_bytes();

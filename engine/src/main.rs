@@ -16,12 +16,18 @@ fn main() {
     // the server to listen on
     let server = Server::new(PORT);
 
-    // used to store the objects
-    let storage = Arc::new(AppendOnlyLogStore::new(
+    // used to store the objects with AOL recovery
+    let storage = match AppendOnlyLogStore::new_with_recovery(
         "./data",
         unsafe { std::num::NonZeroUsize::new_unchecked(4) },
         InMemoryStore::new(4),
-    ));
+    ) {
+        Ok(store) => Arc::new(store),
+        Err(e) => {
+            error!("Failed to initialize storage with recovery: {}", e);
+            return;
+        }
+    };
 
     // Creating a threadpool
     let mut thread_pool = ThreadPool::default();

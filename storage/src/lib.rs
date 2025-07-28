@@ -1,28 +1,7 @@
 use object::{Key, Object};
-use std::time::{SystemTime, UNIX_EPOCH};
 
+pub mod append_only_log;
 pub mod in_memory_store;
-
-/// Represents a stored object with its timestamp
-#[derive(Debug, Clone)]
-struct StoredObject {
-    object: Object,
-    updated_time: u64, // Unix timestamp in seconds
-}
-
-impl StoredObject {
-    fn new(object: Object) -> Self {
-        let updated_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-
-        Self {
-            object,
-            updated_time,
-        }
-    }
-}
 
 /// This trait means that the type can handle storing objects in the database
 pub trait Store {
@@ -35,8 +14,4 @@ pub trait Store {
 
     /// Delete an Object from from its Key and return the deleted Object
     fn remove(&self, key: Key) -> Object;
-
-    /// Get the updated_time for a key as a Unix timestamp in seconds
-    /// Returns 0 if the key doesn't exist
-    fn get_updated_time(&self, key: Key) -> u64;
 }

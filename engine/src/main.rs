@@ -47,11 +47,6 @@ fn main() {
                     Command::Get(key) => storage.retrieve(key),
                     Command::Set(key, object) => storage.store(key, object),
                     Command::Delete(key) => storage.remove(key),
-                    Command::UpdatedTime(key) => {
-                        let timestamp = storage.get_updated_time(key);
-                        // Convert timestamp to Int object (safe cast since timestamps fit in i64)
-                        Object::Int(object::types::int::Int::new(timestamp as i64))
-                    }
                     Command::Close => break,
                 };
 

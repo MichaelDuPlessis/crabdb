@@ -97,10 +97,6 @@ pub enum Command {
     /// Structure is as follows:
     /// | 8 bytes payload size | 1 byte command type | key |
     Delete(Key),
-    /// Get the updated_time for a key as Unix timestamp
-    /// Structure is as follows:
-    /// | 8 bytes payload size | 1 byte command type | key |
-    UpdatedTime(Key),
     /// Close the connection to the client
     /// Structure is as follows:
     /// | 8 bytes payload size | 1 byte command type |
@@ -125,7 +121,6 @@ impl Command {
             Self::GET => Self::new_get(data),
             Self::SET => Self::new_set(data),
             Self::DELETE => Self::new_delete(data),
-            Self::UPDATED_TIME => Self::new_updated_time(data),
             Self::CLOSE => Ok(Self::Close),
             _ => return Err(CommandError::Invalid(command_type)),
         }
@@ -154,13 +149,6 @@ impl Command {
         // extract key
         let (key, _) = Key::new(data.as_slice())?;
         Ok(Self::Delete(key))
-    }
-
-    /// Creates a new UpdatedTime command
-    fn new_updated_time(data: Vec<u8>) -> Result<Self, ObjectError> {
-        // extract key
-        let (key, _) = Key::new(data.as_slice())?;
-        Ok(Self::UpdatedTime(key))
     }
 }
 

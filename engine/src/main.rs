@@ -2,7 +2,7 @@ use logging::{error, info, init_logger, trace};
 use object::Object;
 use server::{Command, Server};
 use std::sync::Arc;
-use storage::{InMemoryStore, Store};
+use storage::{Store, in_memory_store::InMemoryStore};
 use threadpool::ThreadPool;
 
 /// The port to listen on

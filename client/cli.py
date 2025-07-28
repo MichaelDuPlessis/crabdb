@@ -242,6 +242,31 @@ def construct_get_payload(key):
     return total_len_bytes + request_type_byte + request_specific_part
 
 
+def construct_delete_payload(key):
+    """
+    Constructs the binary payload for a DELETE request.
+    """
+    # --- Encode the key ---
+    key_bytes = key.encode('utf-8')
+    key_len = len(key_bytes)
+    if key_len > 65535:  # 2^16 - 1
+        raise ValueError(f"Key too long: {key_len} bytes (max 65535)")
+    key_len_bytes = struct.pack('>H', key_len)
+
+    # --- Assemble the request-specific part ---
+    request_specific_part = key_len_bytes + key_bytes
+
+    # --- Assemble the full payload ---
+    request_type_byte = struct.pack('>B', REQUEST_DELETE)
+    # The total length is the length of everything *after* the initial 8-byte length field.
+    total_len = len(request_type_byte) + len(request_specific_part)
+    total_len_bytes = struct.pack('>Q', total_len)
+
+    # Combine all parts
+    payload = total_len_bytes + request_type_byte + request_specific_part
+    return payload
+
+
 def construct_close_payload():
     """
     Constructs the binary payload for a CLOSE request.
@@ -342,7 +367,7 @@ def interactive_mode(initial_host, initial_port):
     signal.signal(signal.SIGINT, signal_handler)
 
     print("\nEntering interactive mode.")
-    print("Commands: set <key> <value> --type <int|text|list|map> | get <key> | close | connect <host>:<port> | exit | quit")
+    print("Commands: set <key> <value> --type <int|text|list|map> | get <key> | delete <key> | close | connect <host>:<port> | exit | quit")
     print("Quote values with spaces, e.g., set \"my key\" \"my value\" --type text")
     print("Press Ctrl+C to send close request and exit gracefully.")
 
@@ -459,6 +484,23 @@ def interactive_mode(initial_host, initial_port):
                     print("--- Server Response ---")
                     print(response)
 
+                elif command == 'delete':
+                    if db_socket is None:
+                        print(
+                            "Error: Not connected to the database. Use 'connect' first.")
+                        continue
+
+                    if len(parts) != 2:
+                        print("Usage: delete <key>")
+                        continue
+
+                    key = parts[1]
+                    payload = construct_delete_payload(key)
+                    print(f"Sending DELETE request for key='{key}'...")
+                    response = execute_command_on_socket(db_socket, payload)
+                    print("--- Server Response ---")
+                    print(response)
+
                 elif command == 'close':
                     if db_socket is None:
                         print("Error: Not connected to the database.")
@@ -533,6 +575,11 @@ def main():
         'get', help='Get a value by its key from the database.')
     parser_get.add_argument('key', help='The key to retrieve.')
 
+    # --- Parser for the "delete" command ---
+    parser_delete = subparsers.add_parser(
+        'delete', help='Delete a key-value pair from the database.')
+    parser_delete.add_argument('key', help='The key to delete.')
+
     # --- Parser for the "updated_time" command ---
     parser_updated_time = subparsers.add_parser(
         'updated_time', help='Get the updated timestamp for a key from the database.')
@@ -567,6 +614,9 @@ def main():
             elif args.command == 'get':
                 print(f"Executing GET: key='{args.key}'")
                 payload = construct_get_payload(args.key)
+            elif args.command == 'delete':
+                print(f"Executing DELETE: key='{args.key}'")
+                payload = construct_delete_payload(args.key)
             elif args.command == 'close':
                 print("Executing CLOSE: sending shutdown request to server")
                 payload = construct_close_payload()

@@ -1,8 +1,7 @@
 use logging::{error, info, init_logger, trace};
-use object::Object;
 use server::{Command, Server};
 use std::sync::Arc;
-use storage::{Store, in_memory_store::InMemoryStore};
+use storage::{Store, append_only_log::AppendOnlyLogStore, in_memory_store::InMemoryStore};
 use threadpool::ThreadPool;
 
 /// The port to listen on
@@ -18,7 +17,11 @@ fn main() {
     let server = Server::new(PORT);
 
     // used to store the objects
-    let storage = Arc::new(InMemoryStore::default());
+    let storage = Arc::new(AppendOnlyLogStore::new(
+        "./data",
+        unsafe { std::num::NonZeroUsize::new_unchecked(4) },
+        InMemoryStore::new(4),
+    ));
 
     // Creating a threadpool
     let mut thread_pool = ThreadPool::default();

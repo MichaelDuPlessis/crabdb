@@ -19,7 +19,6 @@ TYPE_MAP = 4
 REQUEST_GET = 0
 REQUEST_SET = 1
 REQUEST_DELETE = 2
-REQUEST_UPDATED_TIME = 3
 REQUEST_CLOSE = 255
 
 # Define a mapping from string names to type codes for user input.
@@ -158,19 +157,23 @@ def parse_server_response(response_data_content, declared_len):
         # List payload has a 2-byte count prefix + serialized objects
         if len(response_data_content) < cursor + 2:
             return f"ERROR: Incomplete LIST count. Received {len(response_data_content) - cursor} bytes, expected 2."
-        list_count = struct.unpack('>H', response_data_content[cursor:cursor+2])[0]
+        list_count = struct.unpack(
+            '>H', response_data_content[cursor:cursor+2])[0]
         cursor += 2
-        
-        result, _ = _deserialize_list(response_data_content, cursor, list_count)
+
+        result, _ = _deserialize_list(
+            response_data_content, cursor, list_count)
         return f"Result (List): {result}"
     elif data_type == TYPE_MAP:
         # Map payload has a 2-byte field count prefix + field entries
         if len(response_data_content) < cursor + 2:
             return f"ERROR: Incomplete MAP field count. Received {len(response_data_content) - cursor} bytes, expected 2."
-        field_count = struct.unpack('>H', response_data_content[cursor:cursor+2])[0]
+        field_count = struct.unpack(
+            '>H', response_data_content[cursor:cursor+2])[0]
         cursor += 2
-        
-        result, _ = _deserialize_map(response_data_content, cursor, field_count)
+
+        result, _ = _deserialize_map(
+            response_data_content, cursor, field_count)
         return f"Result (Map): {result}"
     else:
         return f"ERROR: Unknown Data Type received in successful response: {data_type} (Expected 0, 1, 2, 3, or 4)."
@@ -239,42 +242,6 @@ def construct_get_payload(key):
     return total_len_bytes + request_type_byte + request_specific_part
 
 
-def construct_updated_time_payload(key):
-    """
-    Constructs the binary payload for an UPDATED_TIME request.
-    """
-    key_bytes = key.encode('utf-8')
-
-    # --- Assemble the request-specific part ---
-    request_specific_part = struct.pack('>H', len(key_bytes)) + key_bytes
-
-    # --- Assemble the full payload ---
-    request_type_byte = struct.pack('>B', REQUEST_UPDATED_TIME)
-    # The total length is the length of everything *after* the initial 8-byte length field.
-    total_len = len(request_type_byte) + len(request_specific_part)
-    total_len_bytes = struct.pack('>Q', total_len)
-
-    return total_len_bytes + request_type_byte + request_specific_part
-
-
-def construct_updated_time_payload(key):
-    """
-    Constructs the binary payload for an UPDATED_TIME request.
-    """
-    key_bytes = key.encode('utf-8')
-
-    # --- Assemble the request-specific part ---
-    request_specific_part = struct.pack('>H', len(key_bytes)) + key_bytes
-
-    # --- Assemble the full payload ---
-    request_type_byte = struct.pack('>B', REQUEST_UPDATED_TIME)
-    # The total length is the length of everything *after* the initial 8-byte length field.
-    total_len = len(request_type_byte) + len(request_specific_part)
-    total_len_bytes = struct.pack('>Q', total_len)
-
-    return total_len_bytes + request_type_byte + request_specific_part
-
-
 def construct_close_payload():
     """
     Constructs the binary payload for a CLOSE request.
@@ -298,7 +265,7 @@ def send_close_request(sock):
         close_payload = construct_close_payload()
         sock.send(close_payload)
         print("Close request sent to server.")
-        
+
         # The server should close the connection after receiving CLOSE
         # We don't expect a response, but we'll try to read to see if connection closes
         try:
@@ -313,7 +280,7 @@ def send_close_request(sock):
             # Connection closed by server, which is expected
             print("Server closed the connection.")
             return True
-            
+
     except socket.error as e:
         print(f"Error sending close request: {e}")
         return False
@@ -371,11 +338,11 @@ def interactive_mode(initial_host, initial_port):
                 pass
         print("Exiting interactive mode.")
         sys.exit(0)
-    
+
     signal.signal(signal.SIGINT, signal_handler)
 
     print("\nEntering interactive mode.")
-    print("Commands: set <key> <value> --type <int|text|list|map> | get <key> | updated_time <key> | close | connect <host>:<port> | exit | quit")
+    print("Commands: set <key> <value> --type <int|text|list|map> | get <key> | close | connect <host>:<port> | exit | quit")
     print("Quote values with spaces, e.g., set \"my key\" \"my value\" --type text")
     print("Press Ctrl+C to send close request and exit gracefully.")
 
@@ -492,28 +459,11 @@ def interactive_mode(initial_host, initial_port):
                     print("--- Server Response ---")
                     print(response)
 
-                elif command == 'updated_time':
-                    if db_socket is None:
-                        print(
-                            "Error: Not connected to the database. Use 'connect' first.")
-                        continue
-
-                    if len(parts) != 2:
-                        print("Usage: updated_time <key>")
-                        continue
-
-                    key = parts[1]
-                    payload = construct_updated_time_payload(key)
-                    print(f"Sending UPDATED_TIME request for key='{key}'...")
-                    response = execute_command_on_socket(db_socket, payload)
-                    print("--- Server Response ---")
-                    print(response)
-
                 elif command == 'close':
                     if db_socket is None:
                         print("Error: Not connected to the database.")
                         continue
-                    
+
                     print("Sending close request to server...")
                     if send_close_request(db_socket):
                         try:
@@ -586,7 +536,8 @@ def main():
     # --- Parser for the "updated_time" command ---
     parser_updated_time = subparsers.add_parser(
         'updated_time', help='Get the updated timestamp for a key from the database.')
-    parser_updated_time.add_argument('key', help='The key to get the timestamp for.')
+    parser_updated_time.add_argument(
+        'key', help='The key to get the timestamp for.')
 
     # --- Parser for the "close" command ---
     parser_close = subparsers.add_parser(
@@ -616,9 +567,6 @@ def main():
             elif args.command == 'get':
                 print(f"Executing GET: key='{args.key}'")
                 payload = construct_get_payload(args.key)
-            elif args.command == 'updated_time':
-                print(f"Executing UPDATED_TIME: key='{args.key}'")
-                payload = construct_updated_time_payload(args.key)
             elif args.command == 'close':
                 print("Executing CLOSE: sending shutdown request to server")
                 payload = construct_close_payload()
@@ -659,8 +607,8 @@ def _serialize_object(value):
         # Serialize text
         text_bytes = value.encode('utf-8')
         return (
-            struct.pack('>B', TYPE_TEXT) + 
-            struct.pack('>H', len(text_bytes)) + 
+            struct.pack('>B', TYPE_TEXT) +
+            struct.pack('>H', len(text_bytes)) +
             text_bytes
         )
     elif isinstance(value, list):
@@ -668,11 +616,11 @@ def _serialize_object(value):
         serialized_objects = []
         for item in value:
             serialized_objects.append(_serialize_object(item))
-        
+
         serialized_data = b''.join(serialized_objects)
         return (
-            struct.pack('>B', TYPE_LIST) + 
-            struct.pack('>H', len(value)) + 
+            struct.pack('>B', TYPE_LIST) +
+            struct.pack('>H', len(value)) +
             serialized_data
         )
     elif isinstance(value, dict):
@@ -681,20 +629,20 @@ def _serialize_object(value):
         for key, val in value.items():
             if not isinstance(key, str):
                 raise ValueError("Map keys must be strings")
-            
+
             # Serialize field name
             key_bytes = key.encode('utf-8')
             field_data = struct.pack('>H', len(key_bytes)) + key_bytes
-            
+
             # Serialize field value recursively
             field_data += _serialize_object(val)
-            
+
             serialized_fields.append(field_data)
-        
+
         serialized_data = b''.join(serialized_fields)
         return (
-            struct.pack('>B', TYPE_MAP) + 
-            struct.pack('>H', len(value)) + 
+            struct.pack('>B', TYPE_MAP) +
+            struct.pack('>H', len(value)) +
             serialized_data
         )
     else:
@@ -712,17 +660,17 @@ def _serialize_list(value_str):
         items = json.loads(value_str)
         if not isinstance(items, list):
             raise ValueError("List value must be a JSON array")
-        
+
         serialized_objects = []
         for item in items:
             serialized_objects.append(_serialize_object(item))
-        
+
         # Combine all serialized objects
         serialized_data = b''.join(serialized_objects)
-        
+
         # Return count + data
         return struct.pack('>H', len(items)) + serialized_data
-        
+
     except json.JSONDecodeError:
         raise ValueError("List value must be valid JSON array format")
 
@@ -738,27 +686,27 @@ def _serialize_map(value_str):
         obj = json.loads(value_str)
         if not isinstance(obj, dict):
             raise ValueError("Map value must be a JSON object")
-        
+
         serialized_fields = []
         for key, value in obj.items():
             if not isinstance(key, str):
                 raise ValueError("Map keys must be strings")
-            
+
             # Serialize field name
             key_bytes = key.encode('utf-8')
             field_data = struct.pack('>H', len(key_bytes)) + key_bytes
-            
+
             # Serialize field value using the generic object serializer
             field_data += _serialize_object(value)
-            
+
             serialized_fields.append(field_data)
-        
+
         # Combine all serialized fields
         serialized_data = b''.join(serialized_fields)
-        
+
         # Return field count + data
         return struct.pack('>H', len(obj)) + serialized_data
-        
+
     except json.JSONDecodeError:
         raise ValueError("Map value must be valid JSON object format")
 
@@ -771,11 +719,11 @@ def _deserialize_object(data, cursor):
     """
     if cursor >= len(data):
         raise ValueError("Incomplete object data")
-    
+
     # Read type ID
     type_id = data[cursor]
     cursor += 1
-    
+
     if type_id == TYPE_NULL:
         return None, cursor
     elif type_id == TYPE_INT:
@@ -814,11 +762,11 @@ def _deserialize_list(data, cursor, count):
     for _ in range(count):
         if cursor >= len(data):
             raise ValueError("Incomplete list data")
-        
+
         # Deserialize object recursively
         obj, cursor = _deserialize_object(data, cursor)
         items.append(obj)
-    
+
     return items, cursor
 
 
@@ -828,21 +776,21 @@ def _deserialize_map(data, cursor, field_count):
     for _ in range(field_count):
         if cursor + 2 > len(data):
             raise ValueError("Incomplete field name length in map")
-        
+
         # Read field name length
         name_len = struct.unpack('>H', data[cursor:cursor+2])[0]
         cursor += 2
-        
+
         # Read field name
         if cursor + name_len > len(data):
             raise ValueError("Incomplete field name in map")
         field_name = data[cursor:cursor+name_len].decode('utf-8')
         cursor += name_len
-        
+
         # Deserialize field value recursively
         value, cursor = _deserialize_object(data, cursor)
         fields[field_name] = value
-    
+
     return fields, cursor
 
 

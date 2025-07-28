@@ -17,7 +17,7 @@ type KeyLen = u16;
 const KEY_LEN_NUM_BYTES: usize = std::mem::size_of::<KeyLen>();
 
 /// The value under which an object is stored in the database
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Key(Box<[u8]>); // we don't care about the capcity
 
 impl Key {
@@ -42,6 +42,16 @@ impl Key {
                 Err(ObjectError)
             }
         }
+    }
+
+    /// Converts a key to bytes
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(KEY_LEN_NUM_BYTES + self.0.len());
+        let mut buffer = [0; KEY_LEN_NUM_BYTES];
+        buffer.copy_from_slice(&(self.0.len() as u16).to_be_bytes());
+        bytes.extend_from_slice(&buffer);
+        bytes.extend_from_slice(&self.0);
+        bytes
     }
 }
 

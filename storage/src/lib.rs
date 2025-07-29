@@ -1,10 +1,23 @@
 use object::{Key, Object};
+use std::{error::Error, fmt::Display};
 
 pub mod append_only_log;
 pub mod in_memory_store;
 
 /// Used if storing data fails for some reason
+#[derive(Debug)]
 pub struct StoreError;
+
+impl Error for StoreError {}
+
+impl Display for StoreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "An error was encountered while interacting with the store"
+        )
+    }
+}
 
 pub type StoreResult = Result<Object, StoreError>;
 

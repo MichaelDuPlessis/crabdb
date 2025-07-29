@@ -1,4 +1,4 @@
-use crate::{Store, StoreResult};
+use crate::{Store, StoreError, StoreResult};
 use std::{
     fs::File,
     hash::{DefaultHasher, Hash, Hasher},
@@ -28,6 +28,8 @@ pub enum AolError {
     CorruptedEntry(String),
     /// Directory creation failed
     DirectoryCreation(std::io::Error),
+    /// Error with the backing store
+    BackingStore(StoreError),
 }
 
 impl std::fmt::Display for AolError {
@@ -37,6 +39,7 @@ impl std::fmt::Display for AolError {
             AolError::ObjectParse(e) => write!(f, "Object parsing error: {:?}", e),
             AolError::CorruptedEntry(msg) => write!(f, "Corrupted log entry: {}", msg),
             AolError::DirectoryCreation(e) => write!(f, "Failed to create directory: {}", e),
+            AolError::BackingStore(e) => write!(f, "The backing store encountered an error: {}", e),
         }
     }
 }
@@ -52,6 +55,12 @@ impl From<std::io::Error> for AolError {
 impl From<object::ObjectError> for AolError {
     fn from(error: object::ObjectError) -> Self {
         AolError::ObjectParse(error)
+    }
+}
+
+impl From<AolError> for StoreError {
+    fn from(_: AolError) -> Self {
+        StoreError
     }
 }
 
@@ -261,13 +270,11 @@ impl<S: Store> AppendOnlyLogStore<S> {
             let log_entry = Log::from_bytes(log_data)?;
 
             // Apply the operation to the backing store
-            match log_entry {
-                Log::Set(key, object) => {
-                    self.backing_store.store(key, object);
-                }
-                Log::Del(key) => {
-                    self.backing_store.remove(key);
-                }
+            if let Err(e) = match log_entry {
+                Log::Set(key, object) => self.backing_store.store(key, object),
+                Log::Del(key) => self.backing_store.remove(key),
+            } {
+                return Err(AolError::BackingStore(e));
             }
 
             offset += log_size;
@@ -303,9 +310,10 @@ impl<S: Store> Store for AppendOnlyLogStore<S> {
             // If AOL write fails, we should probably fail the entire operation
             // For now, we'll log the error but continue (you might want to change this)
             eprintln!("Warning: Failed to write to AOL: {}", e);
+            Err(e.into())
+        } else {
+            self.backing_store.store(key, object)
         }
-
-        self.backing_store.store(key, object)
     }
 
     fn retrieve(&self, key: object::Key) -> StoreResult {
@@ -318,8 +326,9 @@ impl<S: Store> Store for AppendOnlyLogStore<S> {
         let log = Log::Del(key.clone());
         if let Err(e) = self.log(log) {
             eprintln!("Warning: Failed to write to AOL: {}", e);
+            Err(e.into())
+        } else {
+            self.backing_store.remove(key)
         }
-
-        self.backing_store.remove(key)
     }
 }

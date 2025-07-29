@@ -75,7 +75,7 @@ CrabDB uses a custom binary protocol over TCP. All integers are sent in **big-en
 | Field           | Size (bytes) | Description                                    |
 |-----------------|--------------|------------------------------------------------|
 | Request Length  | 8            | Total length of following data                 |
-| Request Type    | 1            | Command type (`0`=GET, `1`=SET, `255`=CLOSE)  |
+| Request Type    | 1            | Command type                                   |
 | Request Data    | variable     | Command-specific payload                       |
 
 ### Commands

@@ -167,7 +167,7 @@ The `object` crate provides a strongly-typed system where each value knows its t
 - Each connection runs in its own thread with shared storage access
 
 ### Storage
-Currently implements in-memory storage only. The `Store` trait allows for pluggable storage backends (disk persistence, etc.).
+Currently implements and in-memory storage and an append only log store. The `Store` trait allows for pluggable storage backends (disk persistence, etc.).
 
 ### Error Handling
 - Comprehensive error types for network, parsing, and object construction failures

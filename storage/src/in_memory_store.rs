@@ -1,11 +1,10 @@
-use crate::Store;
+use crate::{Store, StoreResult};
 use concurrent_map::ConcurrentMap;
-use object::{Key, Object};
 
 /// Stores data in memory only
 #[derive(Debug, Default)]
 pub struct InMemoryStore {
-    map: ConcurrentMap<Key, Object>,
+    map: ConcurrentMap<object::Key, object::Object>,
 }
 
 impl InMemoryStore {
@@ -18,15 +17,15 @@ impl InMemoryStore {
 }
 
 impl Store for InMemoryStore {
-    fn store(&self, key: Key, object: Object) -> Object {
-        self.map.insert(key, object).into()
+    fn store(&self, key: object::Key, object: object::Object) -> StoreResult {
+        Ok(self.map.insert(key, object).into())
     }
 
-    fn retrieve(&self, key: Key) -> Object {
-        self.map.get(&key).map(|object| object.clone()).into()
+    fn retrieve(&self, key: object::Key) -> StoreResult {
+        Ok(self.map.get(&key).map(|object| object.clone()).into())
     }
 
-    fn remove(&self, key: Key) -> Object {
-        self.map.remove(&key).into()
+    fn remove(&self, key: object::Key) -> StoreResult {
+        Ok(self.map.remove(&key).into())
     }
 }

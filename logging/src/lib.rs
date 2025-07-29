@@ -70,11 +70,13 @@ pub fn log(log_level: LogLevel, file: &str, line_num: u32, msg: std::fmt::Argume
 #[macro_export]
 macro_rules! error {
     ($($args:tt)*) => {
-        // getting the file the error occured
-        let file = file!();
-        // getting the line number
-        let line_num = line!();
-        $crate::log($crate::LogLevel::Error, file, line_num, std::format_args!($($args)*));
+        {
+            // getting the file the error occured
+            let file = file!();
+            // getting the line number
+            let line_num = line!();
+            $crate::log($crate::LogLevel::Error, file, line_num, std::format_args!($($args)*));
+        }
     };
 }
 
@@ -82,11 +84,13 @@ macro_rules! error {
 #[macro_export]
 macro_rules! warn {
     ($($args:tt)*) => {
-        // getting the file the error occured
-        let file = file!();
-        // getting the line number
-        let line_num = line!();
-        $crate::log($crate::LogLevel::Warn, file, line_num, std::format_args!($($args)*));
+        {
+            // getting the file the error occured
+            let file = file!();
+            // getting the line number
+            let line_num = line!();
+            $crate::log($crate::LogLevel::Warn, file, line_num, std::format_args!($($args)*));
+        }
     };
 }
 
@@ -94,11 +98,13 @@ macro_rules! warn {
 #[macro_export]
 macro_rules! debug {
     ($($args:tt)*) => {
-        // getting the file the error occured
-        let file = file!();
-        // getting the line number
-        let line_num = line!();
-        $crate::log($crate::LogLevel::Debug, file, line_num, std::format_args!($($args)*));
+        {
+            // getting the file the error occured
+            let file = file!();
+            // getting the line number
+            let line_num = line!();
+            $crate::log($crate::LogLevel::Debug, file, line_num, std::format_args!($($args)*));
+        }
     };
 }
 
@@ -106,11 +112,13 @@ macro_rules! debug {
 #[macro_export]
 macro_rules! info {
     ($($args:tt)*) => {
-        // getting the file the error occured
-        let file = file!();
-        // getting the line number
-        let line_num = line!();
-        $crate::log($crate::LogLevel::Info, file, line_num, std::format_args!($($args)*));
+        {
+            // getting the file the error occured
+            let file = file!();
+            // getting the line number
+            let line_num = line!();
+            $crate::log($crate::LogLevel::Info, file, line_num, std::format_args!($($args)*));
+        }
     };
 }
 
@@ -118,10 +126,12 @@ macro_rules! info {
 #[macro_export]
 macro_rules! trace {
     ($($args:tt)*) => {
-        // getting the file the error occured
-        let file = file!();
-        // getting the line number
-        let line_num = line!();
-        $crate::log($crate::LogLevel::Trace, file, line_num, std::format_args!($($args)*));
+        {
+            // getting the file the error occured
+            let file = file!();
+            // getting the line number
+            let line_num = line!();
+            $crate::log($crate::LogLevel::Trace, file, line_num, std::format_args!($($args)*));
+        }
     };
 }

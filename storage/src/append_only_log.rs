@@ -1,4 +1,4 @@
-use crate::Store;
+use crate::{Store, StoreResult};
 use std::{
     fs::File,
     hash::{DefaultHasher, Hash, Hasher},
@@ -224,9 +224,10 @@ impl<S: Store> AppendOnlyLogStore<S> {
     /// Recover from a single log file using its index
     fn recover_from_file_index(&mut self, file_index: usize) -> Result<(), AolError> {
         let file_mutex = &self.files[file_index];
-        let mut file = file_mutex.lock()
-            .map_err(|_| AolError::CorruptedEntry("Failed to acquire file lock for recovery".to_string()))?;
-        
+        let mut file = file_mutex.lock().map_err(|_| {
+            AolError::CorruptedEntry("Failed to acquire file lock for recovery".to_string())
+        })?;
+
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
@@ -294,7 +295,7 @@ impl<S: Store> AppendOnlyLogStore<S> {
 }
 
 impl<S: Store> Store for AppendOnlyLogStore<S> {
-    fn store(&self, key: object::Key, object: object::Object) -> object::Object {
+    fn store(&self, key: object::Key, object: object::Object) -> StoreResult {
         // create log to store
         // TODO: get rid of this clone
         let log = Log::Set(key.clone(), object.clone());
@@ -307,11 +308,11 @@ impl<S: Store> Store for AppendOnlyLogStore<S> {
         self.backing_store.store(key, object)
     }
 
-    fn retrieve(&self, key: object::Key) -> object::Object {
+    fn retrieve(&self, key: object::Key) -> StoreResult {
         self.backing_store.retrieve(key)
     }
 
-    fn remove(&self, key: object::Key) -> object::Object {
+    fn remove(&self, key: object::Key) -> StoreResult {
         // create log to delete
         // TODO: get rid of this clone
         let log = Log::Del(key.clone());

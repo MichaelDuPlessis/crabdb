@@ -59,11 +59,15 @@ fn main() {
                     Command::Close => break,
                 };
 
-                trace!("Sending response: {:?}", object);
-                if let Err(e) = connection.send(object) {
-                    error!("Error sending command: {e}");
-                    break;
-                };
+                match object {
+                    Ok(object) => {
+                        trace!("Sending response: {:?}", object);
+                        if let Err(e) = connection.send(object) {
+                            error!("Error sending command: {e}");
+                        };
+                    }
+                    Err(_) => error!("Error occured saving object"),
+                }
             }
         });
     }

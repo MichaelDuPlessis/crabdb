@@ -1,13 +1,6 @@
 use core::error;
 use std::fmt;
-use types::{
-    int::Int,
-    list::List,
-    map::Map,
-    null::Null,
-    text::Text,
-    type_ids::{self, TYPE_ID_NUM_BYTES, TypeId},
-};
+use types::{int::Int, list::List, map::Map, null::Null, text::Text};
 
 pub mod types;
 
@@ -83,6 +76,9 @@ pub enum ObjectKind {
     Map,
 }
 
+/// The number of bytes that the ObjectKind takes
+const OBJECT_KIND_NUM_BYTES: usize = std::mem::size_of::<ObjectKind>();
+
 impl TryFrom<u8> for ObjectKind {
     // TODO: spruce up object error so that it is more descriptive
     type Error = ObjectError;
@@ -100,6 +96,7 @@ impl TryFrom<u8> for ObjectKind {
 }
 
 /// Represents an Object in the database
+#[derive(Debug, Clone)]
 pub struct Object {
     /// The kind of object stored in the database
     kind: ObjectKind,
@@ -127,31 +124,31 @@ impl Object {
 
     /// Create an Object from raw bytes
     pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError> {
+        if bytes.len() < OBJECT_KIND_NUM_BYTES {
+            return Err(ObjectError);
+        }
+
         // First extract the TypeId
-        let mut buffer = [0; TYPE_ID_NUM_BYTES];
-        buffer.copy_from_slice(&bytes[..TYPE_ID_NUM_BYTES]);
-        let type_id = TypeId::from_be_bytes(buffer);
+        let type_id = bytes[0];
         let kind = ObjectKind::try_from(type_id)?;
+        let data_bytes = &bytes[OBJECT_KIND_NUM_BYTES..];
 
-        let bytes = &bytes[TYPE_ID_NUM_BYTES..];
-
-        // Checking if the data is valid
-        let valid = match kind {
-            ObjectKind::Null => Null::validate(bytes),
-            ObjectKind::Int => todo!(),
-            ObjectKind::Text => todo!(),
-            ObjectKind::List => todo!(),
-            ObjectKind::Map => todo!(),
+        // Validate the data and determine how much we consumed
+        let (data, remaining) = match kind {
+            ObjectKind::Null => Null::validate_and_extract(data_bytes)?,
+            ObjectKind::Int => Int::validate_and_extract(data_bytes)?,
+            ObjectKind::Text => Text::validate_and_extract(data_bytes)?,
+            ObjectKind::List => List::validate_and_extract(data_bytes)?,
+            ObjectKind::Map => Map::validate_and_extract(data_bytes)?,
         };
 
-        if !valid {
-            Err(ObjectError)
-        } else {
-            Ok(Self {
+        Ok((
+            Self {
                 kind,
-                data: bytes.into(),
-            })
-        }
+                data: data.to_vec(),
+            },
+            remaining,
+        ))
     }
 }
 

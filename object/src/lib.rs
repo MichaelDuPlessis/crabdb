@@ -67,32 +67,62 @@ impl fmt::Display for ObjectError {
 
 impl error::Error for ObjectError {}
 
-/// Represents an Object in the database
-#[derive(Debug, Clone)]
-pub enum Object {
+/// The types of Objects that can be stored in the database
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum ObjectKind {
     /// This represents no item
-    Null(Null),
+    Null,
     /// A signed integer
-    Int(Int),
+    Int,
     /// A text (string) object
-    Text(Text),
+    Text,
     /// A list of objects
-    List(List),
+    List,
     /// A map (mapping of string keys to objects)
-    Map(Map),
+    Map,
+}
+
+impl TryFrom<u8> for ObjectKind {
+    // TODO: spruce up object error so that it is more descriptive
+    type Error = ObjectError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
+            val if val == Self::Null as u8 => Self::Null,
+            val if val == Self::Int as u8 => Self::Int,
+            val if val == Self::Text as u8 => Self::Text,
+            val if val == Self::List as u8 => Self::List,
+            val if val == Self::Map as u8 => Self::Map,
+            _ => return Err(ObjectError),
+        })
+    }
+}
+
+/// Represents an Object in the database
+pub struct Object {
+    /// The kind of object stored in the database
+    kind: ObjectKind,
+    /// The raw data of the object
+    data: Vec<u8>,
 }
 
 impl Object {
-    // Turn an Object into raw bytes
-    pub fn serialize(&self) -> Vec<u8> {
-        // TODO: A macro would be great here
-        match self {
-            Object::Null(null) => null.serialize(),
-            Object::Int(int) => int.serialize(),
-            Object::Text(text) => text.serialize(),
-            Object::List(list) => list.serialize(),
-            Object::Map(map) => map.serialize(),
+    /// Creates a null object
+    pub fn null() -> Self {
+        Self {
+            kind: ObjectKind::Null,
+            data: Vec::with_capacity(0),
         }
+    }
+
+    /// Turn an Object into raw bytes
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(std::mem::size_of::<ObjectKind>() + self.data.len());
+        bytes.push(self.kind as u8);
+        bytes.extend(&self.data);
+
+        bytes
     }
 
     /// Create an Object from raw bytes
@@ -101,30 +131,26 @@ impl Object {
         let mut buffer = [0; TYPE_ID_NUM_BYTES];
         buffer.copy_from_slice(&bytes[..TYPE_ID_NUM_BYTES]);
         let type_id = TypeId::from_be_bytes(buffer);
+        let kind = ObjectKind::try_from(type_id)?;
 
         let bytes = &bytes[TYPE_ID_NUM_BYTES..];
 
-        // TODO: A macro would be great here
-        match type_id {
-            // Null
-            type_ids::NULL_TYPE_ID => {
-                Null::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
-            }
-            // Int
-            type_ids::INT_TYPE_ID => {
-                Int::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
-            }
-            type_ids::TEXT_TYPE_ID => {
-                Text::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
-            }
-            type_ids::LIST_TYPE_ID => {
-                List::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
-            }
-            type_ids::MAP_TYPE_ID => {
-                Map::deserialize(bytes).map(|(obj, bytes)| (obj.into(), bytes))
-            }
-            // if there is no valid type then return an error
-            _ => Err(ObjectError),
+        // Checking if the data is valid
+        let valid = match kind {
+            ObjectKind::Null => Null::validate(bytes),
+            ObjectKind::Int => todo!(),
+            ObjectKind::Text => todo!(),
+            ObjectKind::List => todo!(),
+            ObjectKind::Map => todo!(),
+        };
+
+        if !valid {
+            Err(ObjectError)
+        } else {
+            Ok(Self {
+                kind,
+                data: bytes.into(),
+            })
         }
     }
 }
@@ -133,7 +159,7 @@ impl From<Option<Object>> for Object {
     fn from(value: Option<Object>) -> Self {
         match value {
             Some(object) => object,
-            None => Self::Null(Null),
+            None => Self::null(),
         }
     }
 }

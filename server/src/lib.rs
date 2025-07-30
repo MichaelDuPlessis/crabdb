@@ -167,19 +167,22 @@ impl Connection {
     /// Recieves a command from the client
     pub fn recieve(&mut self) -> Result<Command, CommandError> {
         // first receive the number of bytes being sent
-        let mut buffer = [0; PAYLOAD_SIZE_NUM_BYTES];
-        self.stream.read_exact(&mut buffer)?;
-        let payload_size = PayloadSize::from_be_bytes(buffer);
+        let mut payload_size_buffer = [0; PAYLOAD_SIZE_NUM_BYTES];
+        self.stream.read_exact(&mut payload_size_buffer)?;
+        let payload_size = PayloadSize::from_be_bytes(payload_size_buffer);
 
-        // recieve the command type
-        // TODO: I know this code is duplicatd I am still trying to decide if I should use a macro, a common trait or just leave it
-        let mut buffer = [0; COMMAND_TYPE_NUM_BYTES];
-        self.stream.read_exact(&mut buffer)?;
-        let command_type = CommandType::from_be_bytes(buffer);
+        // read the entire payload in one syscall
+        let mut payload_buffer = vec![0; payload_size as usize];
+        self.stream.read_exact(&mut payload_buffer)?;
 
-        // reading the rest of the data
-        let mut data = vec![0; payload_size as usize - COMMAND_TYPE_NUM_BYTES];
-        self.stream.read_exact(&mut data)?;
+        // extract command type from the payload
+        if payload_buffer.is_empty() {
+            return Err(CommandError::Invalid(0));
+        }
+        let command_type = payload_buffer[0];
+
+        // extract the data portion (everything after command type)
+        let data = payload_buffer[COMMAND_TYPE_NUM_BYTES..].to_vec();
 
         Command::new(command_type, data)
     }

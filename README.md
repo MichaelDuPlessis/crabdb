@@ -27,9 +27,30 @@ CrabDB is built as a modular Rust workspace with the following components:
 
 ### Running the Server
 
+#### With Cargo (Development)
+
 ```bash
 # Build and run the database engine
 cargo run --bin engine
+```
+
+#### With Docker (Production)
+
+```bash
+# Build the Docker image
+docker build -t crabdb .
+
+# Run the container with data persistence
+docker run -p 7227:7227 -v ./data:/app/data crabdb
+
+# Run in background (detached mode)
+docker run -d -p 7227:7227 -v ./data:/app/data --name crabdb-server crabdb
+
+# Stop the container
+docker stop crabdb-server
+
+# Remove the container
+docker rm crabdb-server
 ```
 
 The server listens on port `7227` by default.

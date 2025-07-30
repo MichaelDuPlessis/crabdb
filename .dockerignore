@@ -1,0 +1,48 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+*.pdb
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker files (don't need these in the build context)
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Data directory (we'll mount this as a volume)
+data/
+
+# Python cache and artifacts
+client/__pycache__/
+client/*.pyc
+client/*.pyo
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+*.log

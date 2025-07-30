@@ -1,3 +1,5 @@
+# This Dockerfile was AI generated. I have reviewed it but a more thorough investigation must still be done
+
 # Use the official Rust image as the base
 FROM rust:1.88 as builder
 

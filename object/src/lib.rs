@@ -101,7 +101,7 @@ pub struct Object {
     /// The kind of object stored in the database
     kind: ObjectKind,
     /// The raw data of the object
-    data: Vec<u8>,
+    data: Box<[u8]>,
 }
 
 impl Object {
@@ -109,7 +109,7 @@ impl Object {
     pub fn null() -> Self {
         Self {
             kind: ObjectKind::Null,
-            data: Vec::with_capacity(0),
+            data: Box::new([]),
         }
     }
 
@@ -123,6 +123,7 @@ impl Object {
     }
 
     /// Create an Object from raw bytes
+    // TODO: is deserialize the best method name
     pub fn deserialize(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError> {
         if bytes.len() < OBJECT_KIND_NUM_BYTES {
             return Err(ObjectError);
@@ -145,7 +146,7 @@ impl Object {
         Ok((
             Self {
                 kind,
-                data: data.to_vec(),
+                data: Box::from(data),
             },
             remaining,
         ))

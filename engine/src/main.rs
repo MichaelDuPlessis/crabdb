@@ -66,7 +66,7 @@ fn main() {
                             error!("Error sending command: {e}");
                         };
                     }
-                    Err(_) => error!("Error occured saving object"),
+                    Err(e) => error!("Error occured saving object: {e:?}"),
                 }
             }
         });

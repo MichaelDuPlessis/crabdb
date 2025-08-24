@@ -1,3 +1,4 @@
+use crate::types::link::Link;
 use core::error;
 use std::fmt;
 use types::{int::Int, list::List, map::Map, null::Null, text::Text};
@@ -15,9 +16,20 @@ pub struct Key(Box<[u8]>); // we don't care about the capcity
 
 impl Key {
     /// Create a new Key from raw bytes
-    /// The bytes provides must have this format:
-    /// | 2 bytes the length of the key (n) | n bytes the key itself |
     pub fn new(bytes: &[u8]) -> Result<(Self, &[u8]), ObjectError> {
+        let (key, rest) = Self::validate_and_extract(bytes)?;
+
+        Ok((Self(Box::from(key)), rest))
+    }
+
+    /// Creates a new key from bytes without verification
+    pub unsafe fn new_unchecked(bytes: &[u8]) -> Self {
+        Self(Box::from(bytes))
+    }
+
+    /// Validate link data and extract the consumed portion
+    /// Link format: | 2 bytes the length of the key (n) | n bytes the key itself |
+    pub fn validate_and_extract(bytes: &[u8]) -> Result<(&[u8], &[u8]), ObjectError> {
         if bytes.len() < KEY_LEN_NUM_BYTES {
             // making sure there is enough data
             Err(ObjectError)
@@ -27,9 +39,9 @@ impl Key {
             let key_len = KeyLen::from_be_bytes(buffer) as usize;
 
             if key_len > 0 {
-                let key = Box::from(&bytes[KEY_LEN_NUM_BYTES..key_len + KEY_LEN_NUM_BYTES]);
+                let key = &bytes[KEY_LEN_NUM_BYTES..key_len + KEY_LEN_NUM_BYTES];
 
-                Ok((Self(key), &bytes[key_len + KEY_LEN_NUM_BYTES..]))
+                Ok((key, &bytes[key_len + KEY_LEN_NUM_BYTES..]))
             } else {
                 // Key len cannot be 0
                 Err(ObjectError)
@@ -74,6 +86,8 @@ pub enum ObjectKind {
     List,
     /// A map (mapping of string keys to objects)
     Map,
+    /// A link to another object in the database
+    Link,
 }
 
 /// The number of bytes that the ObjectKind takes
@@ -90,6 +104,7 @@ impl TryFrom<u8> for ObjectKind {
             val if val == Self::Text as u8 => Self::Text,
             val if val == Self::List as u8 => Self::List,
             val if val == Self::Map as u8 => Self::Map,
+            val if val == Self::Link as u8 => Self::Link,
             _ => return Err(ObjectError),
         })
     }
@@ -141,6 +156,7 @@ impl Object {
             ObjectKind::Text => Text::validate_and_extract(data_bytes)?,
             ObjectKind::List => List::validate_and_extract(data_bytes)?,
             ObjectKind::Map => Map::validate_and_extract(data_bytes)?,
+            ObjectKind::Link => Link::validate_and_extract(data_bytes)?,
         };
 
         Ok((

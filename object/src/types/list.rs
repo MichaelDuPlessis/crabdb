@@ -6,7 +6,7 @@ type ListLen = u16;
 const LIST_LEN_NUM_BYTES: usize = std::mem::size_of::<ListLen>();
 
 /// Represents a list in the database
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct List;
 
 impl List {

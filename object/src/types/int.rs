@@ -7,7 +7,7 @@ const INTERNAL_INT_SIZE: usize = std::mem::size_of::<InternalInt>();
 
 /// The number data type that is stored in the database
 /// it is backed by a signed 64 bit integer
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Int;
 
 impl Int {

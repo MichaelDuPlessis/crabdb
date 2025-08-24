@@ -11,7 +11,7 @@ type FieldCount = u16;
 const FIELD_COUNT_NUM_BYTES: usize = std::mem::size_of::<FieldCount>();
 
 /// Represents a map (mapping of field names to objects) in the database
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Map;
 
 impl Map {
@@ -36,7 +36,7 @@ impl Map {
             if remaining_bytes.len() < FIELD_NAME_LEN_NUM_BYTES {
                 return Err(ObjectError);
             }
-            
+
             let mut buffer = [0; FIELD_NAME_LEN_NUM_BYTES];
             buffer.copy_from_slice(&remaining_bytes[..FIELD_NAME_LEN_NUM_BYTES]);
             let field_name_len = FieldNameLen::from_be_bytes(buffer) as usize;
@@ -46,7 +46,7 @@ impl Map {
             if remaining_bytes.len() < field_name_len {
                 return Err(ObjectError);
             }
-            
+
             let field_name_bytes = &remaining_bytes[..field_name_len];
             if std::str::from_utf8(field_name_bytes).is_err() {
                 return Err(ObjectError);

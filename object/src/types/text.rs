@@ -6,7 +6,7 @@ type TextLen = u16;
 const TEXT_LEN_NUM_BYTES: usize = std::mem::size_of::<TextLen>();
 
 /// Represents a piece of text in the database
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Text;
 
 impl Text {

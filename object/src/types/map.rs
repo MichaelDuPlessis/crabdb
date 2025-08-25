@@ -93,6 +93,7 @@ impl TryFrom<Object> for Map {
     }
 }
 
+// This iterator yields tuples of the fieldname + length as well as the object
 pub struct MapIterator {
     bytes_consumed: usize,
     data: Box<[u8]>,
@@ -109,7 +110,8 @@ impl MapIterator {
 }
 
 impl Iterator for MapIterator {
-    type Item = Object;
+    // TODO: I don't like this box but its fine for now
+    type Item = (Box<[u8]>, Object);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.bytes_consumed == self.data.len() {
@@ -119,18 +121,26 @@ impl Iterator for MapIterator {
 
             // This data should be in an existing map so it has to be valid
             // first extract the field name
+            let field_name_len =
+                slice_to_num!(FieldNameLen, &data[..FIELD_NAME_LEN_NUM_BYTES]) as usize;
+            let field_name_end_pos = FIELD_COUNT_NUM_BYTES + field_name_len;
+            // field name including the number of bytes
+            let field_name = &data[FIELD_NAME_LEN_NUM_BYTES..field_name_end_pos];
 
+            // This data should be in an existing map so it has to be valid
             // TODO: This calls the normal deserialize method but a deserialize_unchecked may yield benefits
-            let (object, remaining) = unsafe { Object::deserialize(&self.data).unwrap_unchecked() };
-            self.bytes_consumed = data.len() - remaining.len();
+            let (object, remaining) =
+                unsafe { Object::deserialize(&data[field_name_end_pos..]).unwrap_unchecked() };
 
-            Some(object)
+            self.bytes_consumed = self.data.len() - remaining.len();
+
+            Some((Box::from(field_name), object))
         }
     }
 }
 
 impl IntoIterator for Map {
-    type Item = Object;
+    type Item = (Box<[u8]>, Object);
 
     type IntoIter = MapIterator;
 
@@ -139,17 +149,20 @@ impl IntoIterator for Map {
     }
 }
 
-// impl From<&[Object]> for List {
-//     fn from(value: &[Object]) -> Self {
-//         let len = value.len() as ListLen;
+// TODO: This would be better if it took a &[u8] but it was easier to get it working this way
+// in relation to the resolve_links code
+impl From<&[(Box<[u8]>, Object)]> for Map {
+    fn from(value: &[(Box<[u8]>, Object)]) -> Self {
+        let len = value.len() as FieldCount;
 
-//         // TODO: Investigate if "with_capacity" is possible here
-//         let mut data = Vec::new();
-//         data.extend(len.to_be_bytes());
-//         for object in value {
-//             data.extend(object.data());
-//         }
+        // TODO: Investigate if "with_capacity" is possible here
+        let mut data = Vec::new();
+        data.extend(len.to_be_bytes());
+        for (field_name, object) in value {
+            data.extend(field_name);
+            data.extend(object.data());
+        }
 
-//         Self(data.into_boxed_slice())
-//     }
-// }
+        Self(data.into_boxed_slice())
+    }
+}

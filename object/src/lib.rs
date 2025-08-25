@@ -128,6 +128,11 @@ pub struct Object {
 }
 
 impl Object {
+    /// Create a new Object from an ObjectKind and the raw data. The raw data is not checked so this can lead to UB.
+    pub unsafe fn new_unchecked(kind: ObjectKind, data: Box<[u8]>) -> Self {
+        Self { kind, data }
+    }
+
     /// Creates a null object
     pub fn null() -> Self {
         Self {

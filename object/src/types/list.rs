@@ -92,8 +92,8 @@ impl Iterator for ListIterator {
 
             // This data should be in an existing list so it has to be valid
             // TODO: This calls the normal deserialize method but a deserialize_unchecked may yield benefits
-            let (object, remaining) = unsafe { Object::deserialize(&self.data).unwrap_unchecked() };
-            self.bytes_consumed = data.len() - remaining.len();
+            let (object, remaining) = unsafe { Object::deserialize(data).unwrap_unchecked() };
+            self.bytes_consumed = self.data.len() - remaining.len();
 
             Some(object)
         }

@@ -2,6 +2,10 @@
 
 use object::types::{link::Link, list::List, map::Map};
 
+// TODO: I personally think there are a lot of things that can be done better here.
+// there are many memory allocations and I am still deciding if I like how
+// this code is structured but if it works for now its fine.
+
 /// Resolves the links of an object and returns a new Object with the Links resolved
 /// It requires a reference to the storage to resolve the links
 pub fn resolve_links<T: storage::Store>(
@@ -43,8 +47,13 @@ fn resolve_map_links<T: storage::Store>(
     // This is safe since the only way a list could get stored is if it is valid
     // if something happend that made it not valid then we have a bigger problem
     let map = unsafe { Map::from_object_unchecked(object) };
+    let mut records = Vec::with_capacity(map.num_fields() as usize);
 
-    todo!()
+    for (field_name, object) in map {
+        records.push((field_name, resolve_links(object, storage)?));
+    }
+
+    Ok(Map::from(records.as_slice()).into())
 }
 
 /// Resolve links for a Link

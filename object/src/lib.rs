@@ -5,6 +5,16 @@ use types::{int::Int, list::List, map::Map, null::Null, text::Text};
 
 pub mod types;
 
+/// Convert a slice to a number
+#[macro_export]
+macro_rules! slice_to_num {
+    ($t:ty, $bytes:expr) => {{
+        let mut arr = [0u8; ::std::mem::size_of::<$t>()];
+        arr.copy_from_slice($bytes);
+        <$t>::from_be_bytes(arr)
+    }};
+}
+
 /// The data type used to store the key length
 type KeyLen = u16;
 /// The number of bytes the key length requires
@@ -34,9 +44,7 @@ impl Key {
             // making sure there is enough data
             Err(ObjectError)
         } else {
-            let mut buffer = [0; KEY_LEN_NUM_BYTES];
-            buffer.copy_from_slice(&bytes[..KEY_LEN_NUM_BYTES]);
-            let key_len = KeyLen::from_be_bytes(buffer) as usize;
+            let key_len = slice_to_num!(KeyLen, &bytes[..KEY_LEN_NUM_BYTES]) as usize;
 
             if key_len > 0 {
                 let key = &bytes[KEY_LEN_NUM_BYTES..key_len + KEY_LEN_NUM_BYTES];

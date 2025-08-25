@@ -1,4 +1,4 @@
-use crate::{Object, ObjectError, ObjectKind};
+use crate::{Object, ObjectError, ObjectKind, slice_to_num};
 
 /// The data type used to store the length of List in the payload
 type ListLen = u16;
@@ -12,10 +12,7 @@ pub struct List(Box<[u8]>);
 impl List {
     /// Get the Len of the list
     pub fn len(&self) -> ListLen {
-        let mut len = [0; LIST_LEN_NUM_BYTES];
-        len.copy_from_slice(&self.0[..LIST_LEN_NUM_BYTES]);
-
-        ListLen::from_be_bytes(len)
+        slice_to_num!(ListLen, &self.0[..LIST_LEN_NUM_BYTES])
     }
 
     /// Create an Int from an Object without verifying if it is valid (this method does not check the object_kind field)
@@ -31,9 +28,7 @@ impl List {
         }
 
         // Extract the list length
-        let mut buffer = [0; LIST_LEN_NUM_BYTES];
-        buffer.copy_from_slice(&bytes[..LIST_LEN_NUM_BYTES]);
-        let list_len = ListLen::from_be_bytes(buffer) as usize;
+        let list_len = slice_to_num!(ListLen, &bytes[..LIST_LEN_NUM_BYTES]) as usize;
 
         let mut remaining_bytes = &bytes[LIST_LEN_NUM_BYTES..];
 

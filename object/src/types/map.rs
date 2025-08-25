@@ -1,4 +1,4 @@
-use crate::{Object, ObjectError, ObjectKind};
+use crate::{Object, ObjectError, ObjectKind, slice_to_num};
 
 /// The data type used to store the length of field name in the payload
 type FieldNameLen = u16;
@@ -17,10 +17,7 @@ pub struct Map(Box<[u8]>);
 impl Map {
     /// Get the number of fields in the map
     pub fn num_fields(&self) -> FieldCount {
-        let mut num_fields = [0; FIELD_COUNT_NUM_BYTES];
-        num_fields.copy_from_slice(&self.0[..FIELD_COUNT_NUM_BYTES]);
-
-        FieldCount::from_be_bytes(num_fields)
+        slice_to_num!(FieldCount, &self.0[..FIELD_COUNT_NUM_BYTES])
     }
 
     /// Create an Int from an Object without verifying if it is valid (this method does not check the object_kind field)
@@ -37,9 +34,7 @@ impl Map {
         }
 
         // Extract the field count
-        let mut buffer = [0; FIELD_COUNT_NUM_BYTES];
-        buffer.copy_from_slice(&bytes[..FIELD_COUNT_NUM_BYTES]);
-        let field_count = FieldCount::from_be_bytes(buffer) as usize;
+        let field_count = slice_to_num!(FieldCount, &bytes[..FIELD_COUNT_NUM_BYTES]) as usize;
 
         let mut remaining_bytes = &bytes[FIELD_COUNT_NUM_BYTES..];
 
@@ -50,9 +45,8 @@ impl Map {
                 return Err(ObjectError);
             }
 
-            let mut buffer = [0; FIELD_NAME_LEN_NUM_BYTES];
-            buffer.copy_from_slice(&remaining_bytes[..FIELD_NAME_LEN_NUM_BYTES]);
-            let field_name_len = FieldNameLen::from_be_bytes(buffer) as usize;
+            let field_name_len =
+                slice_to_num!(FieldNameLen, &remaining_bytes[..FIELD_NAME_LEN_NUM_BYTES]) as usize;
             remaining_bytes = &remaining_bytes[FIELD_NAME_LEN_NUM_BYTES..];
 
             // Validate field name exists and is valid UTF-8
@@ -98,3 +92,64 @@ impl TryFrom<Object> for Map {
         }
     }
 }
+
+pub struct MapIterator {
+    bytes_consumed: usize,
+    data: Box<[u8]>,
+}
+
+impl MapIterator {
+    /// Create a new ListIterator
+    fn new(list: Map) -> Self {
+        Self {
+            bytes_consumed: FIELD_COUNT_NUM_BYTES,
+            data: list.0,
+        }
+    }
+}
+
+impl Iterator for MapIterator {
+    type Item = Object;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.bytes_consumed == self.data.len() {
+            None
+        } else {
+            let data = &self.data[self.bytes_consumed..];
+
+            // This data should be in an existing map so it has to be valid
+            // first extract the field name
+
+            // TODO: This calls the normal deserialize method but a deserialize_unchecked may yield benefits
+            let (object, remaining) = unsafe { Object::deserialize(&self.data).unwrap_unchecked() };
+            self.bytes_consumed = data.len() - remaining.len();
+
+            Some(object)
+        }
+    }
+}
+
+impl IntoIterator for Map {
+    type Item = Object;
+
+    type IntoIter = MapIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter::new(self)
+    }
+}
+
+// impl From<&[Object]> for List {
+//     fn from(value: &[Object]) -> Self {
+//         let len = value.len() as ListLen;
+
+//         // TODO: Investigate if "with_capacity" is possible here
+//         let mut data = Vec::new();
+//         data.extend(len.to_be_bytes());
+//         for object in value {
+//             data.extend(object.data());
+//         }
+
+//         Self(data.into_boxed_slice())
+//     }
+// }

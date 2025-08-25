@@ -1,6 +1,6 @@
 // Resolves Links between objects
 
-use object::types::{link::Link, list::List};
+use object::types::{link::Link, list::List, map::Map};
 
 /// Resolves the links of an object and returns a new Object with the Links resolved
 /// It requires a reference to the storage to resolve the links
@@ -40,6 +40,10 @@ fn resolve_map_links<T: storage::Store>(
     object: object::Object,
     storage: &T,
 ) -> storage::StoreResult {
+    // This is safe since the only way a list could get stored is if it is valid
+    // if something happend that made it not valid then we have a bigger problem
+    let map = unsafe { Map::from_object_unchecked(object) };
+
     todo!()
 }
 

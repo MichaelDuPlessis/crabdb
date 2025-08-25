@@ -73,7 +73,7 @@ impl fmt::Display for ObjectError {
 impl error::Error for ObjectError {}
 
 /// The types of Objects that can be stored in the database
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ObjectKind {
     /// This represents no item
@@ -126,6 +126,16 @@ impl Object {
             kind: ObjectKind::Null,
             data: Box::new([]),
         }
+    }
+
+    /// Get an Object's kind
+    pub fn kind(&self) -> ObjectKind {
+        self.kind
+    }
+
+    /// Get the raw data of the object
+    pub fn data(&self) -> &[u8] {
+        &self.data
     }
 
     /// Turn an Object into raw bytes

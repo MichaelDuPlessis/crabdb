@@ -1,4 +1,4 @@
-use crate::{Object, ObjectError};
+use crate::{Object, ObjectError, ObjectKind};
 
 /// The data type used to store the length of field name in the payload
 type FieldNameLen = u16;
@@ -12,9 +12,22 @@ const FIELD_COUNT_NUM_BYTES: usize = std::mem::size_of::<FieldCount>();
 
 /// Represents a map (mapping of field names to objects) in the database
 #[derive(Debug)]
-pub struct Map;
+pub struct Map(Box<[u8]>);
 
 impl Map {
+    /// Get the number of fields in the map
+    pub fn num_fields(&self) -> FieldCount {
+        let mut num_fields = [0; FIELD_COUNT_NUM_BYTES];
+        num_fields.copy_from_slice(&self.0[..FIELD_COUNT_NUM_BYTES]);
+
+        FieldCount::from_be_bytes(num_fields)
+    }
+
+    /// Create an Int from an Object without verifying if it is valid (this method does not check the object_kind field)
+    pub unsafe fn from_object_unchecked(object: Object) -> Self {
+        Self(object.data)
+    }
+
     /// Validate map data and extract the consumed portion
     /// Map format: | 2 bytes field count | field entries... |
     /// Field entry: | 2 bytes name length | name bytes | serialized object |
@@ -62,5 +75,26 @@ impl Map {
         let consumed_len = bytes.len() - remaining_bytes.len();
         let (consumed, remaining) = bytes.split_at(consumed_len);
         Ok((consumed, remaining))
+    }
+}
+
+impl From<Map> for Object {
+    fn from(value: Map) -> Self {
+        Self {
+            kind: ObjectKind::Map,
+            data: value.0,
+        }
+    }
+}
+
+impl TryFrom<Object> for Map {
+    type Error = ObjectError;
+
+    fn try_from(value: Object) -> Result<Self, Self::Error> {
+        if value.kind() == ObjectKind::Map {
+            Ok(unsafe { Self::from_object_unchecked(value) })
+        } else {
+            Err(ObjectError)
+        }
     }
 }

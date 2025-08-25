@@ -4,6 +4,8 @@ use std::sync::Arc;
 use storage::{Store, append_only_log::AppendOnlyLogStore, in_memory_store::InMemoryStore};
 use threadpool::ThreadPool;
 
+mod link_resolver;
+
 /// The port to listen on
 const PORT: u16 = 7227;
 

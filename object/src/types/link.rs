@@ -37,3 +37,15 @@ impl TryFrom<Object> for Link {
         }
     }
 }
+
+impl From<Link> for Key {
+    fn from(value: Link) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<Key> for Link {
+    fn from(value: Key) -> Self {
+        Self(value.0)
+    }
+}

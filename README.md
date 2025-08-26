@@ -19,7 +19,7 @@ CrabDB is built as a modular Rust workspace with the following components:
 
 - **TCP-based protocol** with binary serialization
 - **Concurrent connections** using a custom thread pool
-- **Type-safe data storage** with Null, Int (i64), Text, List, and Map types
+- **Type-safe data storage** with Null, Int (i64), Text, List, Map, and Link types
 - **Thread-safe in-memory storage** using a custom concurrent hash map
 - **Zero external dependencies** - everything built from scratch for learning
 
@@ -99,16 +99,37 @@ CrabDB uses a custom binary protocol over TCP. All integers are sent in **big-en
 | Request Type    | 1            | Command type                                   |
 | Request Data    | variable     | Command-specific payload                       |
 
+### Key Format
+
+Keys are used to identify objects in the database and have the following structure:
+
+| Field      | Size (bytes) | Description                    |
+|------------|-------------|--------------------------------|
+| Key Length | 2           | Length of key string           |
+| Key        | variable    | UTF-8 encoded key              |
+
 ### Commands
 
 #### GET Command (Type: `0`)
-Retrieve a value by key.
+Retrieve a value by key with optional parameters.
 
 **Request Payload:**
-| Field      | Size (bytes) | Description           |
-|------------|-------------|-----------------------|
-| Key Length | 2           | Length of key string  |
-| Key        | variable    | UTF-8 encoded key     |
+| Field      | Size (bytes) | Description                              |
+|------------|-------------|------------------------------------------|
+| Key        | variable    | Key structure (see Key Format above)     |
+| Num Params | 1           | Number of parameters (optional)          |
+| Parameters | variable    | Parameter entries (if Num Params > 0)   |
+
+**Parameter Format:**
+| Field       | Size (bytes) | Description                             |
+|-------------|-------------|-----------------------------------------|
+| Param Type  | 1           | Parameter type identifier               |
+| Param Value | variable    | Parameter-specific data                 |
+
+**Supported Parameters:**
+- **Link Resolution (Type: `1`)**: 1-byte value specifying maximum link resolution depth
+
+**Note**: If no parameters are supplied, no link resolution will take place and Link objects will be returned as-is.
 
 #### SET Command (Type: `1`)
 Store a key-value pair.
@@ -116,8 +137,7 @@ Store a key-value pair.
 **Request Payload:**
 | Field      | Size (bytes) | Description                    |
 |------------|-------------|--------------------------------|
-| Key Length | 2           | Length of key string           |
-| Key        | variable    | UTF-8 encoded key              |
+| Key        | variable    | Key structure (see Key Format above) |
 | Data Type  | 1           | Value type (`0`/`1`/`2`/`3`/`4`) |
 | Data       | variable    | Type-specific value data       |
 
@@ -127,8 +147,7 @@ Delete a value by key.
 **Request Payload:**
 | Field      | Size (bytes) | Description           |
 |------------|-------------|-----------------------|
-| Key Length | 2           | Length of key string  |
-| Key        | variable    | UTF-8 encoded key     |
+| Key        | variable    | Key structure (see Key Format above) |
 
 #### CLOSE Command (Type: `255`)
 Close the connection. No payload required.
@@ -142,6 +161,7 @@ Close the connection. No payload required.
 | `2`     | Text      | 2-byte length + UTF-8 string data       |
 | `3`     | List      | 2-byte count + serialized objects       |
 | `4`     | Map       | 2-byte field count + field entries      |
+| `5`     | Link      | Same format as Key (see Key Format above)   |
 
 #### List Format (Type ID: `3`)
 | Field        | Size (bytes) | Description                    |
@@ -161,6 +181,17 @@ Close the connection. No payload required.
 | Field Name Len  | 2            | Length of field name           |
 | Field Name      | variable     | UTF-8 encoded field name       |
 | Object          | variable     | Serialized object value        |
+
+#### Link Type and Resolution
+
+The **Link** type (Type ID: `5`) allows objects to reference other objects in the database by their key. Links use the same storage format as keys and enable creating relationships between data.
+
+**Link Resolution:**
+- When retrieving objects with GET parameters, links can be automatically resolved to their target objects
+- Link resolution is recursive - if a linked object contains more links, they will also be resolved
+- Maximum resolution depth prevents infinite loops in circular references
+- Cycle detection prevents infinite recursion when objects reference each other
+- If no link resolution parameter is provided, Link objects are returned as-is without resolution
 
 ### Response Structure
 

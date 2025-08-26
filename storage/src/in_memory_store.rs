@@ -21,8 +21,8 @@ impl Store for InMemoryStore {
         Ok(self.map.insert(key, object).into())
     }
 
-    fn retrieve(&self, key: object::Key) -> StoreResult {
-        Ok(self.map.get(&key).map(|object| object.clone()).into())
+    fn retrieve(&self, key: &object::Key) -> StoreResult {
+        Ok(self.map.get(key).map(|object| object.clone()).into())
     }
 
     fn remove(&self, key: object::Key) -> StoreResult {

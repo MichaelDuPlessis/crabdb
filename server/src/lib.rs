@@ -90,11 +90,8 @@ impl From<object::ObjectError> for CommandError {
 /// The parameters to use for link resolution
 /// This param has a 1 byte value
 #[derive(Debug)]
-struct LinkResolution {
+pub struct LinkResolution {
     /// The maximum number of times link resolution may take place before exiting
-    /// 0 resolutions means that there is no maximum number of resolutions and
-    /// resolutions should continue until a cyclic dependency or a crash
-    /// 0 should probably not be used
     max_resolutions: u8,
 }
 
@@ -105,7 +102,7 @@ impl LinkResolution {
     }
 
     /// Return the max number of resolutions
-    fn max_resolutions(&self) -> u8 {
+    pub fn max_resolutions(&self) -> u8 {
         self.max_resolutions
     }
 
@@ -126,7 +123,8 @@ impl LinkResolution {
 #[derive(Debug, Default)]
 pub struct GetParams {
     /// Whether links should get resolved or not
-    link_resolution: Option<LinkResolution>,
+    // TODO: should this be pub?
+    pub link_resolution: Option<LinkResolution>,
 }
 
 impl GetParams {

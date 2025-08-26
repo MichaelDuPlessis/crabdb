@@ -316,7 +316,7 @@ impl<S: Store> Store for AppendOnlyLogStore<S> {
         }
     }
 
-    fn retrieve(&self, key: object::Key) -> StoreResult {
+    fn retrieve(&self, key: &object::Key) -> StoreResult {
         self.backing_store.retrieve(key)
     }
 

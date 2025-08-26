@@ -1,5 +1,6 @@
+use crate::link_resolver::LinkResolver;
 use logging::{error, info, init_logger, trace};
-use server::{Command, Server};
+use server::{Command, GetParams, Server};
 use std::sync::Arc;
 use storage::{Store, append_only_log::AppendOnlyLogStore, in_memory_store::InMemoryStore};
 use threadpool::ThreadPool;
@@ -55,10 +56,29 @@ fn main() {
                 trace!("Command recieved: {:?}", command);
 
                 let object = match command {
-                    Command::Get(key, _) => storage.retrieve(key),
+                    Command::Get(key, params) => {
+                        let object = storage.retrieve(&key);
+
+                        let GetParams {
+                            link_resolution, ..
+                        } = params;
+
+                        if let Some(link_resolution) = link_resolution
+                            && let Ok(object) = object
+                        {
+                            let mut link_resolver =
+                                LinkResolver::new(link_resolution, storage.as_ref());
+                            link_resolver.resolve_links(object)
+                        } else {
+                            object
+                        }
+                    }
                     Command::Set(key, object) => storage.store(key, object),
                     Command::Delete(key) => storage.remove(key),
-                    Command::Close => break,
+                    Command::Close => {
+                        info!("Recieved close command. Terminating connection");
+                        break;
+                    }
                 };
 
                 match object {

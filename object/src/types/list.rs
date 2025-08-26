@@ -126,12 +126,13 @@ impl ListBuilder {
     }
 
     /// Adds a field to the MapBuilder but does not increment the field_count. It requires the field_name (with the prefixed length) as well as the Object
+    // TODO: Should this method be unsafe since if you don't know what you are doing bad things can happen
     pub fn add_item_no_increment(&mut self, object: Object) {
         self.data.extend(object.serialize());
     }
 
     /// Adds a field to the MapBuilder. It requires the field_name (with the prefixed length) as well as the Object
-    pub fn add_ite(&mut self, object: Object) {
+    pub fn add_item(&mut self, object: Object) {
         self.add_item_no_increment(object);
         self.len += 1;
     }

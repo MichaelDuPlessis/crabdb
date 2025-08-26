@@ -110,8 +110,6 @@ impl Command {
     const SET: CommandType = 1;
     /// The value for the Delete Command
     const DELETE: CommandType = 2;
-    /// The value for the UpdatedTime Command
-    const UPDATED_TIME: CommandType = 3;
     /// Value for the Close Command
     const CLOSE: CommandType = 255;
 

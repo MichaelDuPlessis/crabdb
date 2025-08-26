@@ -165,6 +165,7 @@ impl MapBuilder {
     }
 
     /// Adds a field to the MapBuilder but does not increment the field_count. It requires the field_name (with the prefixed length) as well as the Object
+    // TODO: Should this method be unsafe since if you don't know what you are doing bad things can happen
     pub fn add_field_no_increment(&mut self, field_name: &[u8], object: Object) {
         self.data.extend(field_name);
         self.data.extend(object.serialize());

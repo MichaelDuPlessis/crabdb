@@ -149,20 +149,44 @@ impl IntoIterator for Map {
     }
 }
 
-// TODO: This would be better if it took a &[u8] but it was easier to get it working this way
-// in relation to the resolve_links code
-impl From<&[(Box<[u8]>, Object)]> for Map {
-    fn from(value: &[(Box<[u8]>, Object)]) -> Self {
-        let len = value.len() as FieldCount;
+/// Used to incrementally build a map
+#[derive(Debug)]
+pub struct MapBuilder {
+    field_count: FieldCount,
+    data: Vec<u8>,
+}
 
-        // TODO: Investigate if "with_capacity" is possible here
-        let mut data = Vec::new();
-        data.extend(len.to_be_bytes());
-        for (field_name, object) in value {
-            data.extend(field_name);
-            data.extend(object.data());
-        }
+impl MapBuilder {
+    /// Create a new MapBuilder with an initial count for the number of fields
+    pub fn new(field_count: FieldCount) -> Self {
+        let data = vec![0; FIELD_COUNT_NUM_BYTES];
 
-        Self(data.into_boxed_slice())
+        Self { field_count, data }
+    }
+
+    /// Adds a field to the MapBuilder but does not increment the field_count. It requires the field_name (with the prefixed length) as well as the Object
+    pub fn add_field_no_increment(&mut self, field_name: &[u8], object: Object) {
+        self.data.extend(field_name);
+        self.data.extend(object.serialize());
+    }
+
+    /// Adds a field to the MapBuilder. It requires the field_name (with the prefixed length) as well as the Object
+    pub fn add_field(&mut self, field_name: &[u8], object: Object) {
+        self.add_field_no_increment(field_name, object);
+        self.field_count += 1;
+    }
+
+    /// Turns the MapBuilder into a Map. i.e. it builds the Map
+    pub fn build(mut self) -> Map {
+        self.data[..FIELD_COUNT_NUM_BYTES]
+            .copy_from_slice(self.field_count.to_be_bytes().as_slice());
+
+        Map(self.data.into_boxed_slice())
+    }
+}
+
+impl Default for MapBuilder {
+    fn default() -> Self {
+        Self::new(0)
     }
 }

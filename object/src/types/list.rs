@@ -110,17 +110,42 @@ impl IntoIterator for List {
     }
 }
 
-impl From<&[Object]> for List {
-    fn from(value: &[Object]) -> Self {
-        let len = value.len() as ListLen;
+/// Used to incrementally build a map
+#[derive(Debug)]
+pub struct ListBuilder {
+    len: ListLen,
+    data: Vec<u8>,
+}
 
-        // TODO: Investigate if "with_capacity" is possible here
-        let mut data = Vec::new();
-        data.extend(len.to_be_bytes());
-        for object in value {
-            data.extend(object.data());
-        }
+impl ListBuilder {
+    /// Create a new MapBuilder with an initial count for the number of fields
+    pub fn new(len: ListLen) -> Self {
+        let data = vec![0; LIST_LEN_NUM_BYTES];
 
-        Self(data.into_boxed_slice())
+        Self { len, data }
+    }
+
+    /// Adds a field to the MapBuilder but does not increment the field_count. It requires the field_name (with the prefixed length) as well as the Object
+    pub fn add_item_no_increment(&mut self, object: Object) {
+        self.data.extend(object.serialize());
+    }
+
+    /// Adds a field to the MapBuilder. It requires the field_name (with the prefixed length) as well as the Object
+    pub fn add_ite(&mut self, object: Object) {
+        self.add_item_no_increment(object);
+        self.len += 1;
+    }
+
+    /// Turns the MapBuilder into a Map. i.e. it builds the Map
+    pub fn build(mut self) -> List {
+        self.data[..LIST_LEN_NUM_BYTES].copy_from_slice(self.len.to_be_bytes().as_slice());
+
+        List(self.data.into_boxed_slice())
+    }
+}
+
+impl Default for ListBuilder {
+    fn default() -> Self {
+        Self::new(0)
     }
 }

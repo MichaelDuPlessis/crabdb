@@ -55,7 +55,7 @@ fn main() {
                 trace!("Command recieved: {:?}", command);
 
                 let object = match command {
-                    Command::Get(key) => storage.retrieve(key),
+                    Command::Get(key, _) => storage.retrieve(key),
                     Command::Set(key, object) => storage.store(key, object),
                     Command::Delete(key) => storage.remove(key),
                     Command::Close => break,

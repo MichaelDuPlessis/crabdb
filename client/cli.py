@@ -15,6 +15,7 @@ TYPE_INT = 1
 TYPE_TEXT = 2
 TYPE_LIST = 3
 TYPE_MAP = 4
+TYPE_LINK = 5
 
 REQUEST_GET = 0
 REQUEST_SET = 1
@@ -28,6 +29,7 @@ DATA_TYPE_MAP = {
     "null": TYPE_NULL,
     "list": TYPE_LIST,
     "map": TYPE_MAP,
+    "link": TYPE_LINK,
 }
 
 
@@ -175,8 +177,22 @@ def parse_server_response(response_data_content, declared_len):
         result, _ = _deserialize_map(
             response_data_content, cursor, field_count)
         return f"Result (Map): {result}"
+    elif data_type == TYPE_LINK:
+        # Link payload has a 2-byte length prefix + key data (same format as Key)
+        if len(response_data_content) < cursor + 2:
+            return f"ERROR: Incomplete LINK length. Received {len(response_data_content) - cursor} bytes, expected 2."
+        link_len = struct.unpack(
+            '>H', response_data_content[cursor:cursor+2])[0]
+        cursor += 2
+        
+        # Check if we have enough data for the link key
+        expected_len = 1 + 2 + link_len  # Data Type + Length + Key
+        if declared_len != expected_len or len(response_data_content) < cursor + link_len:
+            return f"ERROR: Incomplete LINK data payload. Declared length {declared_len}, content length {len(response_data_content) - cursor} bytes, expected {link_len}."
+        link_key = response_data_content[cursor:cursor + link_len].decode('utf-8')
+        return f"Result (Link): -> '{link_key}'"
     else:
-        return f"ERROR: Unknown Data Type received in successful response: {data_type} (Expected 0, 1, 2, 3, or 4)."
+        return f"ERROR: Unknown Data Type received in successful response: {data_type} (Expected 0, 1, 2, 3, 4, or 5)."
 
 
 def construct_set_payload(key, value_str, value_type):
@@ -208,6 +224,10 @@ def construct_set_payload(key, value_str, value_type):
     elif value_type == TYPE_MAP:
         # Parse JSON-like map format: {"key1": value1, "key2": value2}
         data_payload = _serialize_map(value_str)
+    elif value_type == TYPE_LINK:
+        # Link type uses the same format as a key: 2-byte length + UTF-8 key data
+        link_key_bytes = value_str.encode('utf-8')
+        data_payload = struct.pack('>H', len(link_key_bytes)) + link_key_bytes
     else:
         raise ValueError(f"Unsupported data type for SET: {value_type}")
 
@@ -226,7 +246,7 @@ def construct_set_payload(key, value_str, value_type):
 
 def construct_get_payload(key):
     """
-    Constructs the binary payload for a GET request.
+    Constructs the binary payload for a GET request without parameters.
     """
     key_bytes = key.encode('utf-8')
 
@@ -236,6 +256,36 @@ def construct_get_payload(key):
     # --- Assemble the full payload ---
     request_type_byte = struct.pack('>B', REQUEST_GET)
     # The total length is the length of everything *after* the initial 8-byte length field.
+    total_len = len(request_type_byte) + len(request_specific_part)
+    total_len_bytes = struct.pack('>Q', total_len)
+
+    return total_len_bytes + request_type_byte + request_specific_part
+
+
+def construct_get_payload_with_params(key, link_resolution_depth=None):
+    """
+    Constructs the binary payload for a GET request with optional parameters.
+    
+    Args:
+        key: The key to retrieve
+        link_resolution_depth: Optional maximum link resolution depth (0-255)
+    """
+    key_bytes = key.encode('utf-8')
+    
+    # Start with key
+    request_specific_part = struct.pack('>H', len(key_bytes)) + key_bytes
+    
+    # Add parameters if any
+    if link_resolution_depth is not None:
+        # Add number of parameters (1 byte)
+        request_specific_part += struct.pack('>B', 1)  # 1 parameter
+        
+        # Add link resolution parameter (type 1, 1-byte value)
+        request_specific_part += struct.pack('>B', 1)  # Parameter type: Link Resolution
+        request_specific_part += struct.pack('>B', link_resolution_depth)  # Max resolution depth
+    
+    # --- Assemble the full payload ---
+    request_type_byte = struct.pack('>B', REQUEST_GET)
     total_len = len(request_type_byte) + len(request_specific_part)
     total_len_bytes = struct.pack('>Q', total_len)
 
@@ -367,8 +417,10 @@ def interactive_mode(initial_host, initial_port):
     signal.signal(signal.SIGINT, signal_handler)
 
     print("\nEntering interactive mode.")
-    print("Commands: set <key> <value> --type <int|text|list|map> | get <key> | delete <key> | close | connect <host>:<port> | exit | quit")
+    print("Commands: set <key> <value> --type <int|text|null|list|map|link> | get <key> [--resolve-links <depth>] | delete <key> | close | connect <host>:<port> | exit | quit")
     print("Quote values with spaces, e.g., set \"my key\" \"my value\" --type text")
+    print("Use 'link' type to reference other keys, e.g., set mylink mykey --type link")
+    print("Use --resolve-links with GET to automatically resolve link references")
     print("Press Ctrl+C to send close request and exit gracefully.")
 
     try:
@@ -429,8 +481,7 @@ def interactive_mode(initial_host, initial_port):
 
                         cmd_type = parts[type_arg_index + 1].lower()
                         if cmd_type not in DATA_TYPE_MAP:
-                            print(f"Error: Invalid type '{
-                                  cmd_type}'. Must be int, text, or null.")
+                            print(f"Error: Invalid type '{cmd_type}'. Must be int, text, null, list, map, or link.")
                             continue
 
                         # Ensure enough parts for key and value before --type
@@ -473,13 +524,34 @@ def interactive_mode(initial_host, initial_port):
                             "Error: Not connected to the database. Use 'connect' first.")
                         continue
 
-                    if len(parts) != 2:
-                        print("Usage: get <key>")
+                    if len(parts) < 2:
+                        print("Usage: get <key> [--resolve-links <depth>]")
                         continue
 
                     key = parts[1]
-                    payload = construct_get_payload(key)
-                    print(f"Sending GET request for key='{key}'...")
+                    
+                    # Check for --resolve-links parameter
+                    link_resolution_depth = None
+                    if len(parts) >= 4 and parts[2] == '--resolve-links':
+                        try:
+                            link_resolution_depth = int(parts[3])
+                            if link_resolution_depth < 0 or link_resolution_depth > 255:
+                                print("Error: Link resolution depth must be between 0 and 255")
+                                continue
+                        except ValueError:
+                            print("Error: Link resolution depth must be a valid integer")
+                            continue
+                    elif len(parts) > 2:
+                        print("Usage: get <key> [--resolve-links <depth>]")
+                        continue
+                    
+                    if link_resolution_depth is not None:
+                        payload = construct_get_payload_with_params(key, link_resolution_depth)
+                        print(f"Sending GET request for key='{key}' with link resolution depth={link_resolution_depth}...")
+                    else:
+                        payload = construct_get_payload(key)
+                        print(f"Sending GET request for key='{key}'...")
+                    
                     response = execute_command_on_socket(db_socket, payload)
                     print("--- Server Response ---")
                     print(response)
@@ -568,12 +640,16 @@ def main():
     parser_set.add_argument(
         'value', help='The value to associate with the key. For "null" type, the value will be ignored.')
     parser_set.add_argument(
-        '--type', choices=['int', 'text', 'null'], required=True, help='The data type of the value.')
+        '--type', choices=['int', 'text', 'null', 'list', 'map', 'link'], required=True, 
+        help='The data type of the value. Use "link" to reference another key.')
 
     # --- Parser for the "get" command ---
     parser_get = subparsers.add_parser(
         'get', help='Get a value by its key from the database.')
     parser_get.add_argument('key', help='The key to retrieve.')
+    parser_get.add_argument('--resolve-links', type=int, metavar='DEPTH',
+                           help='Enable link resolution with maximum depth (0-255). '
+                                'Links will be automatically resolved to their target objects.')
 
     # --- Parser for the "delete" command ---
     parser_delete = subparsers.add_parser(
@@ -612,8 +688,12 @@ def main():
                 payload = construct_set_payload(
                     args.key, value_to_send, value_type_code)
             elif args.command == 'get':
-                print(f"Executing GET: key='{args.key}'")
-                payload = construct_get_payload(args.key)
+                if hasattr(args, 'resolve_links') and args.resolve_links is not None:
+                    print(f"Executing GET: key='{args.key}' with link resolution depth={args.resolve_links}")
+                    payload = construct_get_payload_with_params(args.key, args.resolve_links)
+                else:
+                    print(f"Executing GET: key='{args.key}'")
+                    payload = construct_get_payload(args.key)
             elif args.command == 'delete':
                 print(f"Executing DELETE: key='{args.key}'")
                 payload = construct_delete_payload(args.key)
@@ -802,6 +882,15 @@ def _deserialize_object(data, cursor):
         field_count = struct.unpack('>H', data[cursor:cursor+2])[0]
         cursor += 2
         return _deserialize_map(data, cursor, field_count)
+    elif type_id == TYPE_LINK:
+        if cursor + 2 > len(data):
+            raise ValueError("Incomplete link length")
+        link_len = struct.unpack('>H', data[cursor:cursor+2])[0]
+        cursor += 2
+        if cursor + link_len > len(data):
+            raise ValueError("Incomplete link data")
+        link_key = data[cursor:cursor+link_len].decode('utf-8')
+        return f"Link -> '{link_key}'", cursor + link_len
     else:
         raise ValueError(f"Unsupported type ID: {type_id}")
 

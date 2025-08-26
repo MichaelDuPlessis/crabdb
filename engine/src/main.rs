@@ -74,7 +74,7 @@ fn main() {
                         }
                     }
                     Command::Set(key, object) => storage.store(key, object),
-                    Command::Delete(key) => storage.remove(key),
+                    Command::Delete(key) => storage.remove(&key),
                     Command::Close => {
                         info!("Recieved close command. Terminating connection");
                         break;

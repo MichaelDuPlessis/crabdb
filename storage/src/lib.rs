@@ -31,5 +31,5 @@ pub trait Store {
     fn retrieve(&self, key: &Key) -> StoreResult;
 
     /// Delete an Object from from its Key and return the deleted Object
-    fn remove(&self, key: Key) -> StoreResult;
+    fn remove(&self, key: &Key) -> StoreResult;
 }

@@ -13,11 +13,8 @@ use std::collections::HashSet;
 
 /// Manages link resolution
 pub struct LinkResolver<'a, T: storage::Store> {
-    /// The number of resolutions so far
-    // This cannot be a u8 since then it could never be greater than max_resolutions
-    num_resolutions: u16,
     /// The max number of resolutions that can occur
-    max_resolutions: u8,
+    max_resolution_depth: u8,
     /// Links that have already been visited, used for cycle detection
     visited: HashSet<Key>,
     /// The storage medium used
@@ -28,8 +25,7 @@ impl<'a, T: storage::Store> LinkResolver<'a, T> {
     /// Creates a new LinkResolver
     pub fn new(link_resolutions: LinkResolution, storage: &'a T) -> Self {
         Self {
-            num_resolutions: 0,
-            max_resolutions: link_resolutions.max_resolutions(),
+            max_resolution_depth: link_resolutions.max_resolution_depth(),
             visited: HashSet::new(),
             storage,
         }
@@ -39,29 +35,46 @@ impl<'a, T: storage::Store> LinkResolver<'a, T> {
     /// It requires a reference to the storage to resolve the links. If max resolutions is
     /// reached or a cycle is detected the object as is will be returend
     // TODO: should cycles cause an error?
-    pub fn resolve_links(&mut self, object: object::Object) -> storage::StoreResult {
-        if self.num_resolutions > self.max_resolutions as u16 {
+    pub fn resolve(&mut self, object: object::Object) -> storage::StoreResult {
+        // The resolution depth so far
+        // This cannot be a u8 since then it could never be greater than max_resolution_depth
+        let resolution_depth = 0u16;
+
+        self.resolve_links(object, resolution_depth)
+    }
+
+    fn resolve_links(
+        &mut self,
+        object: object::Object,
+        resolution_depth: u16,
+    ) -> storage::StoreResult {
+        if resolution_depth > self.max_resolution_depth as u16 {
             return Ok(object);
         }
+        let resolution_depth = resolution_depth + 1;
 
         match object.kind() {
-            object::ObjectKind::List => self.resolve_list_links(object),
-            object::ObjectKind::Map => self.resolve_map_links(object),
-            object::ObjectKind::Link => self.resolve_link(object),
+            object::ObjectKind::List => self.resolve_list_links(object, resolution_depth),
+            object::ObjectKind::Map => self.resolve_map_links(object, resolution_depth),
+            object::ObjectKind::Link => self.resolve_link(object, resolution_depth),
             // Int, Text, Null cannot contain links
             _ => Ok(object),
         }
     }
 
     /// Resolve links for a List
-    fn resolve_list_links(&mut self, object: object::Object) -> storage::StoreResult {
+    fn resolve_list_links(
+        &mut self,
+        object: object::Object,
+        resolution_depth: u16,
+    ) -> storage::StoreResult {
         // This is safe since the only way a list could get stored is if it is valid
         // if something happend that made it not valid then we have a bigger problem
         let list = unsafe { List::from_object_unchecked(object) };
         let mut builder = ListBuilder::new(list.len());
 
         for object in list {
-            let object = self.resolve_links(object)?;
+            let object = self.resolve_links(object, resolution_depth)?;
             builder.add_item_no_increment(object);
         }
 
@@ -69,21 +82,32 @@ impl<'a, T: storage::Store> LinkResolver<'a, T> {
     }
 
     /// Resolve links for a Map
-    fn resolve_map_links(&mut self, object: object::Object) -> storage::StoreResult {
+    fn resolve_map_links(
+        &mut self,
+        object: object::Object,
+        resolution_depth: u16,
+    ) -> storage::StoreResult {
         // This is safe since the only way a list could get stored is if it is valid
         // if something happend that made it not valid then we have a bigger problem
         let map = unsafe { Map::from_object_unchecked(object) };
         let mut builder = MapBuilder::new(map.num_fields());
 
         for (field_name, object) in map {
-            builder.add_field_no_increment(field_name.as_ref(), self.resolve_links(object)?);
+            builder.add_field_no_increment(
+                field_name.as_ref(),
+                self.resolve_links(object, resolution_depth)?,
+            );
         }
 
         Ok(builder.build().into())
     }
 
     /// Resolve links for a Link
-    fn resolve_link(&mut self, object: object::Object) -> storage::StoreResult {
+    fn resolve_link(
+        &mut self,
+        object: object::Object,
+        resolution_depth: u16,
+    ) -> storage::StoreResult {
         // This is safe since the only way a link could get stored is if it is valid
         // if something happend that made it not valid then we have a bigger problem
         let link = unsafe { Link::from_object_unchecked(object) };
@@ -100,6 +124,6 @@ impl<'a, T: storage::Store> LinkResolver<'a, T> {
         self.visited.insert(key);
 
         // the object retrieve may also have links that need to be resolved
-        self.resolve_links(object)
+        self.resolve_links(object, resolution_depth)
     }
 }

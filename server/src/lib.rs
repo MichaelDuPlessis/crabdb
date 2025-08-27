@@ -93,18 +93,20 @@ impl From<object::ObjectError> for CommandError {
 #[derive(Debug)]
 pub struct LinkResolution {
     /// The maximum number of times link resolution may take place before exiting
-    max_resolutions: u8,
+    max_resolution_depth: u8,
 }
 
 impl LinkResolution {
     /// Create a new LinkResolution from bytes
-    fn new(max_resolutions: u8) -> Self {
-        Self { max_resolutions }
+    fn new(max_resolution_depth: u8) -> Self {
+        Self {
+            max_resolution_depth,
+        }
     }
 
     /// Return the max number of resolutions
-    pub fn max_resolutions(&self) -> u8 {
-        self.max_resolutions
+    pub fn max_resolution_depth(&self) -> u8 {
+        self.max_resolution_depth
     }
 
     /// Extract the number of resolutions from bytes to create a LinkResolution and return the remaining bytes

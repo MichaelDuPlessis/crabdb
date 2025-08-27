@@ -32,6 +32,9 @@ fn main() {
         }
     };
 
+    info!("Loaded data from file");
+    info!("{:?}", storage);
+
     // Creating a threadpool
     let mut thread_pool = ThreadPool::default();
 
@@ -68,7 +71,7 @@ fn main() {
                         {
                             let mut link_resolver =
                                 LinkResolver::new(link_resolution, storage.as_ref());
-                            link_resolver.resolve_links(object)
+                            link_resolver.resolve(object)
                         } else {
                             object
                         }

@@ -125,7 +125,7 @@ impl Iterator for MapIterator {
                 slice_to_num!(FieldNameLen, &data[..FIELD_NAME_LEN_NUM_BYTES]) as usize;
             let field_name_end_pos = FIELD_COUNT_NUM_BYTES + field_name_len;
             // field name including the number of bytes
-            let field_name = &data[FIELD_NAME_LEN_NUM_BYTES..field_name_end_pos];
+            let field_name = &data[..field_name_end_pos];
 
             // This data should be in an existing map so it has to be valid
             // TODO: This calls the normal deserialize method but a deserialize_unchecked may yield benefits

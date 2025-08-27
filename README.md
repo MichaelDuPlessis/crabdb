@@ -55,38 +55,6 @@ docker rm crabdb-server
 
 The server listens on port `7227` by default.
 
-### Using the Python Client
-
-```bash
-# Interactive mode
-python3 client/cli.py
-
-# Direct commands
-python3 client/cli.py set mykey int 42
-python3 client/cli.py set mytext text "hello world"
-python3 client/cli.py set mylist list '[1, "hello", null]'
-python3 client/cli.py set mymap map '{"name": "John", "age": 30, "active": null}'
-python3 client/cli.py set nested map '{"user": {"name": "Alice", "scores": [95, 87, 92]}, "meta": {"created": "2024-01-01"}}'
-python3 client/cli.py set complex list '[{"id": 1, "tags": ["red", "blue"]}, {"id": 2, "tags": ["green"]}]'
-python3 client/cli.py get mykey
-python3 client/cli.py get mylist
-python3 client/cli.py get mymap
-python3 client/cli.py get nested
-python3 client/cli.py close
-python3 client/cli.py del mykey
-```
-
-**Note**: List and Map values use JSON format:
-- **Lists**: `'[1, "hello", null]'` - JSON array with mixed types
-- **Maps**: `'{"name": "John", "age": 30, "active": null}'` - JSON object with string keys
-- **Nested structures**: Full nesting support - Lists can contain Maps, Maps can contain Lists, etc.
-
-**Interactive Mode**: 
-- Use `python3 client/cli.py --interactive` for persistent connections
-- Press **Ctrl+C** to gracefully send a close request and exit
-- Use `close` command to send shutdown request to server
-- Use `exit` or `quit` to close the client (also sends close request if connected)
-
 ## Protocol Specification
 
 CrabDB uses a custom binary protocol over TCP. All integers are sent in **big-endian** format.
@@ -112,6 +80,8 @@ Keys are used to identify objects in the database and have the following structu
 
 #### GET Command (Type: `0`)
 Retrieve a value by key with optional parameters.
+
+**Note**: If the key does not exist, a Null value is returned.
 
 **Request Payload:**
 | Field      | Size (bytes) | Description                              |
@@ -190,7 +160,8 @@ The **Link** type (Type ID: `5`) allows objects to reference other objects in th
 - When retrieving objects with GET parameters, links can be automatically resolved to their target objects
 - Link resolution is recursive - if a linked object contains more links, they will also be resolved
 - Maximum resolution depth prevents infinite loops in circular references
-- Cycle detection prevents infinite recursion when objects reference each other
+- **Cycle Detection**: When circular references are detected (A links to B, B links to A), the resolution stops and returns the link object as-is to prevent infinite recursion
+- **Depth Limit**: When the specified resolution depth is reached, any remaining unresolved links are returned as link objects rather than their target values
 - If no link resolution parameter is provided, Link objects are returned as-is without resolution
 
 ### Response Structure

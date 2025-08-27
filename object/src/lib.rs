@@ -1,5 +1,6 @@
 use crate::types::link::Link;
 use core::error;
+use logging::trace;
 use std::fmt;
 use types::{int::Int, list::List, map::Map, null::Null, text::Text};
 
@@ -47,7 +48,7 @@ impl Key {
             let key_len = slice_to_num!(KeyLen, &bytes[..KEY_LEN_NUM_BYTES]) as usize;
 
             if key_len > 0 {
-                let key = &bytes[KEY_LEN_NUM_BYTES..key_len + KEY_LEN_NUM_BYTES];
+                let key = &bytes[..key_len + KEY_LEN_NUM_BYTES];
 
                 Ok((key, &bytes[key_len + KEY_LEN_NUM_BYTES..]))
             } else {

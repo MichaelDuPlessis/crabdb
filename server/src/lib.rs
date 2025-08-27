@@ -1,4 +1,4 @@
-use object::{Key, Object, ObjectError};
+use object::{Key, Object};
 use std::{
     fmt,
     io::{self, Read, Write},

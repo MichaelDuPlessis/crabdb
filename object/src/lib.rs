@@ -23,6 +23,8 @@ const KEY_LEN_NUM_BYTES: usize = std::mem::size_of::<KeyLen>();
 
 /// The value under which an object is stored in the database
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
+// TODO: Currently key stores its length as well which seems a bit redundent but is used for the Link type
+// this should possibly be changed and new intermediary type created since now an extra 2 bytes per key is wasted
 pub struct Key(Box<[u8]>); // we don't care about the capcity
 
 impl Key {

@@ -51,6 +51,7 @@ pub enum CommandError {
     /// The Command requested does not exist
     Invalid(CommandType),
     /// There was an issue with the passed in parameters
+    // TODO: This isn't very explicit, passing in an error message would greatly imporove it
     Param,
 }
 
@@ -174,6 +175,8 @@ pub enum Command {
     /// Structure is as follows:
     /// | 8 bytes payload size | 1 byte command type | key | 1 byte num params (optional) | 1 byte param type if param num present| n bytes param value| more params |
     /// Params are passed in as a bitflag. Param values are evaluated from lowest bit value to the highest
+    // TODO: the number of parameters passed in isn't really required but it does allow for further extensibility later on. At some point I should
+    // decide if its needed
     Get(Key, GetParams),
     /// Create an Object in the DB
     /// Structure is as follows:

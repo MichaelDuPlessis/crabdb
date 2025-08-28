@@ -144,6 +144,9 @@ dependencies = [
 [[package]]
 name = "object"
 version = "0.1.0"
+dependencies = [
+ "logging",
+]
 
 [[package]]
 name = "once_cell"

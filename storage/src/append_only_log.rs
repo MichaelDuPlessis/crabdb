@@ -272,7 +272,7 @@ impl<S: Store> AppendOnlyLogStore<S> {
             // Apply the operation to the backing store
             if let Err(e) = match log_entry {
                 Log::Set(key, object) => self.backing_store.store(key, object),
-                Log::Del(key) => self.backing_store.remove(key),
+                Log::Del(key) => self.backing_store.remove(&key),
             } {
                 return Err(AolError::BackingStore(e));
             }
@@ -316,11 +316,11 @@ impl<S: Store> Store for AppendOnlyLogStore<S> {
         }
     }
 
-    fn retrieve(&self, key: object::Key) -> StoreResult {
+    fn retrieve(&self, key: &object::Key) -> StoreResult {
         self.backing_store.retrieve(key)
     }
 
-    fn remove(&self, key: object::Key) -> StoreResult {
+    fn remove(&self, key: &object::Key) -> StoreResult {
         // create log to delete
         // TODO: get rid of this clone
         let log = Log::Del(key.clone());

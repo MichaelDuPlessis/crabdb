@@ -1,8 +1,11 @@
+use crate::link_resolver::LinkResolver;
 use logging::{error, info, init_logger, trace};
-use server::{Command, Server};
+use server::{Command, GetParams, Server};
 use std::sync::Arc;
 use storage::{Store, append_only_log::AppendOnlyLogStore, in_memory_store::InMemoryStore};
 use threadpool::ThreadPool;
+
+mod link_resolver;
 
 /// The port to listen on
 const PORT: u16 = 7227;
@@ -29,6 +32,9 @@ fn main() {
         }
     };
 
+    info!("Loaded data from file");
+    info!("{:?}", storage);
+
     // Creating a threadpool
     let mut thread_pool = ThreadPool::default();
 
@@ -53,10 +59,29 @@ fn main() {
                 trace!("Command recieved: {:?}", command);
 
                 let object = match command {
-                    Command::Get(key) => storage.retrieve(key),
+                    Command::Get(key, params) => {
+                        let object = storage.retrieve(&key);
+
+                        let GetParams {
+                            link_resolution, ..
+                        } = params;
+
+                        if let Some(link_resolution) = link_resolution
+                            && let Ok(object) = object
+                        {
+                            let mut link_resolver =
+                                LinkResolver::new(link_resolution, storage.as_ref());
+                            link_resolver.resolve(object)
+                        } else {
+                            object
+                        }
+                    }
                     Command::Set(key, object) => storage.store(key, object),
-                    Command::Delete(key) => storage.remove(key),
-                    Command::Close => break,
+                    Command::Delete(key) => storage.remove(&key),
+                    Command::Close => {
+                        info!("Recieved close command. Terminating connection");
+                        break;
+                    }
                 };
 
                 match object {
@@ -66,7 +91,7 @@ fn main() {
                             error!("Error sending command: {e}");
                         };
                     }
-                    Err(_) => error!("Error occured saving object"),
+                    Err(e) => error!("Error occured saving object: {e:?}"),
                 }
             }
         });

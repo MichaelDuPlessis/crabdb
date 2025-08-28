@@ -28,8 +28,8 @@ pub trait Store {
     fn store(&self, key: Key, object: Object) -> StoreResult;
 
     /// Retrieve an Object from its Key if it exists otherwise return the Null Object
-    fn retrieve(&self, key: Key) -> StoreResult;
+    fn retrieve(&self, key: &Key) -> StoreResult;
 
     /// Delete an Object from from its Key and return the deleted Object
-    fn remove(&self, key: Key) -> StoreResult;
+    fn remove(&self, key: &Key) -> StoreResult;
 }

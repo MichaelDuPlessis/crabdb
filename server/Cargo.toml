@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 object = { path = "../object" }
+autocodec = { git = "https://github.com/MichaelDuPlessis/autocodec" }

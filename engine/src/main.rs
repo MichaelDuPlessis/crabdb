@@ -1,6 +1,6 @@
 use crate::link_resolver::LinkResolver;
 use logging::{error, info, init_logger, trace};
-use server::{Command, GetParams, Server};
+use server::{Command, Server};
 use std::sync::Arc;
 use storage::{Store, append_only_log::AppendOnlyLogStore, in_memory_store::InMemoryStore};
 use threadpool::ThreadPool;
@@ -62,11 +62,7 @@ fn main() {
                     Command::Get(key, params) => {
                         let object = storage.retrieve(&key);
 
-                        let GetParams {
-                            link_resolution, ..
-                        } = params;
-
-                        if let Some(link_resolution) = link_resolution
+                        if let Some(link_resolution) = params.link_resolution()
                             && let Ok(object) = object
                         {
                             let mut link_resolver =

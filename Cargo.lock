@@ -25,16 +25,18 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "autocodec"
-version = "0.1.0"
-source = "git+https://github.com/MichaelDuPlessis/autocodec#8805f3851049fca80677491e515988494a9f2aad"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e0d9f0d8b084d384fb5487de92844706f9963db8084af6eec5c270763de4fba"
 dependencies = [
  "autocodec_derive",
 ]
 
 [[package]]
 name = "autocodec_derive"
-version = "0.1.0"
-source = "git+https://github.com/MichaelDuPlessis/autocodec#8805f3851049fca80677491e515988494a9f2aad"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "816f1f4159798c5e298aa1447f09fc7a880cee1fc70569e725199caa0995421b"
 dependencies = [
  "proc-macro2",
  "quote",

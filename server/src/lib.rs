@@ -1,4 +1,5 @@
 use object::{Key, Object};
+use autocodec::Codec;
 use std::{
     fmt,
     io::{self, Read, Write},
@@ -46,30 +47,24 @@ const COMMAND_TYPE_NUM_BYTES: usize = std::mem::size_of::<CommandType>();
 pub enum CommandError {
     /// When an error occurs with the underlying network
     Network(io::Error),
-    /// When an error occurs while building an Object
-    Object(object::ObjectError),
+    /// When an error occurs while decoding an Object or Key
+    Codec(autocodec::CodecError),
     /// The Command requested does not exist
     Invalid(CommandType),
-    /// There was an issue with the passed in parameters
-    // TODO: This isn't very explicit, passing in an error message would greatly imporove it
-    Param,
 }
 
 impl fmt::Display for CommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CommandError::Network(error) => write!(f, "a network error occured {}", error),
-            CommandError::Object(object_error) => {
-                write!(f, "unable to create object {}", object_error)
+            CommandError::Codec(error) => {
+                write!(f, "unable to decode: {}", error)
             }
             CommandError::Invalid(command_type) => write!(
                 f,
                 "the command type sent was invalid, received: {}",
                 command_type
             ),
-            CommandError::Param => {
-                write!(f, "an error occured while evaluating passed in parameters",)
-            }
         }
     }
 }
@@ -82,9 +77,9 @@ impl From<io::Error> for CommandError {
     }
 }
 
-impl From<object::ObjectError> for CommandError {
-    fn from(value: object::ObjectError) -> Self {
-        Self::Object(value)
+impl From<autocodec::CodecError> for CommandError {
+    fn from(value: autocodec::CodecError) -> Self {
+        Self::Codec(value)
     }
 }
 
@@ -97,76 +92,31 @@ pub struct LinkResolution {
 }
 
 impl LinkResolution {
-    /// Create a new LinkResolution from bytes
-    fn new(max_resolution_depth: u8) -> Self {
-        Self {
-            max_resolution_depth,
-        }
-    }
-
     /// Return the max number of resolutions
     pub fn max_resolution_depth(&self) -> u8 {
         self.max_resolution_depth
     }
-
-    /// Extract the number of resolutions from bytes to create a LinkResolution and return the remaining bytes
-    /// Returns an error if there is not enough bytes
-    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), CommandError> {
-        if bytes.is_empty() {
-            Err(CommandError::Param)
-        } else {
-            // Already verified that it is not empty
-            let max_resolutions = unsafe { bytes.get_unchecked(0) };
-            Ok((Self::new(*max_resolutions), &bytes[1..]))
-        }
-    }
 }
 
-/// Contains the params that can be sent along with the get command
-#[derive(Debug, Default)]
+/// A GET command parameter
+#[derive(Debug, Codec)]
+#[repr(u8)]
+pub enum GetParam {
+    LinkResolution(u8) = 1,
+}
+
+/// Contains the params sent with a GET command
+#[derive(Debug, Default, Codec)]
 pub struct GetParams {
-    /// Whether links should get resolved or not
-    // TODO: should this be pub?
-    pub link_resolution: Option<LinkResolution>,
+    #[codec(trailing, len = "u8")]
+    pub params: Vec<GetParam>,
 }
 
 impl GetParams {
-    /// The number associated with link resolution parameter
-    const LINK_RESOLUTION_VAL: u8 = 1;
-
-    /// Create new GetParams from bytes
-    /// returns a CommandError::Param if there is an erro parsing
-    fn from_bytes(data: &[u8]) -> Result<Self, CommandError> {
-        let mut params = GetParams::default();
-
-        if data.is_empty() {
-            return Ok(params);
-        }
-
-        // getting num params
-        let num_params = unsafe { *data.get_unchecked(0) }; // we know there is at least 1 element
-
-        let mut data = &data[1..];
-        for _ in 0..num_params {
-            // check if there is enough data to continue
-            if data.is_empty() {
-                return Err(CommandError::Param);
-            }
-
-            // getting the param type
-            let param_type = unsafe { *data.get_unchecked(0) }; // we know there is at least 1 element
-
-            match param_type {
-                Self::LINK_RESOLUTION_VAL => {
-                    let (link_resolution, rest) = LinkResolution::from_bytes(&data[1..])?;
-                    params.link_resolution = Some(link_resolution);
-                    data = rest;
-                }
-                _ => return Err(CommandError::Param),
-            }
-        }
-
-        Ok(params)
+    pub fn link_resolution(&self) -> Option<LinkResolution> {
+        self.params.iter().find_map(|p| match p {
+            GetParam::LinkResolution(depth) => Some(LinkResolution { max_resolution_depth: *depth }),
+        })
     }
 }
 
@@ -217,26 +167,21 @@ impl Command {
 
     /// Creates a new Get command
     fn new_get(data: Vec<u8>) -> Result<Self, CommandError> {
-        // extract key
-        let (key, rest) = Key::new(data.as_slice())?;
-        let params = GetParams::from_bytes(rest)?;
+        let (key, rest) = Key::decode(data.as_slice())?;
+        let (params, _) = GetParams::decode(rest)?;
         Ok(Self::Get(key, params))
     }
 
     /// Creates a new Set command
     fn new_set(data: Vec<u8>) -> Result<Self, CommandError> {
-        // first extract Key
-        let (key, data) = Key::new(data.as_slice())?;
-        Ok(Self::Set(
-            key,
-            Object::deserialize(data).map(|(obj, _)| obj)?,
-        ))
+        let (key, rest) = Key::decode(data.as_slice())?;
+        let (object, _) = Object::decode(rest)?;
+        Ok(Self::Set(key, object))
     }
 
     /// Creates a new Delete command
     fn new_delete(data: Vec<u8>) -> Result<Self, CommandError> {
-        // extract key
-        let (key, _) = Key::new(data.as_slice())?;
+        let (key, _) = Key::decode(data.as_slice())?;
         Ok(Self::Delete(key))
     }
 }
@@ -278,13 +223,11 @@ impl Connection {
 
     /// Sends data back to the client
     pub fn send(&mut self, object: Object) -> Result<(), io::Error> {
-        let object = object.serialize();
-        // getting legnth of payload
-        let payload_size = object.len() as u64;
+        let payload_size = object.encoded_size() as u64;
 
-        // building payload
-        let mut payload = payload_size.to_be_bytes().to_vec();
-        payload.extend(object);
+        let mut payload = Vec::with_capacity(8 + payload_size as usize);
+        payload.extend_from_slice(&payload_size.to_be_bytes());
+        object.encode(&mut payload);
 
         self.stream.write_all(&payload)
     }

@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 object = { path = "../object" }
+autocodec = "0.1.1"

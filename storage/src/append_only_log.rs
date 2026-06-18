@@ -1,4 +1,5 @@
 use crate::{Store, StoreError, StoreResult};
+use autocodec::Codec;
 use std::{
     fs::File,
     hash::{DefaultHasher, Hash, Hasher},
@@ -23,7 +24,7 @@ pub enum AolError {
     /// I/O error during file operations
     Io(std::io::Error),
     /// Error parsing objects during recovery
-    ObjectParse(object::ObjectError),
+    ObjectParse(autocodec::CodecError),
     /// Corrupted log entry (invalid size or format)
     CorruptedEntry(String),
     /// Directory creation failed
@@ -36,7 +37,7 @@ impl std::fmt::Display for AolError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AolError::Io(e) => write!(f, "I/O error: {}", e),
-            AolError::ObjectParse(e) => write!(f, "Object parsing error: {:?}", e),
+            AolError::ObjectParse(e) => write!(f, "Object parsing error: {}", e),
             AolError::CorruptedEntry(msg) => write!(f, "Corrupted log entry: {}", msg),
             AolError::DirectoryCreation(e) => write!(f, "Failed to create directory: {}", e),
             AolError::BackingStore(e) => write!(f, "The backing store encountered an error: {}", e),
@@ -52,8 +53,8 @@ impl From<std::io::Error> for AolError {
     }
 }
 
-impl From<object::ObjectError> for AolError {
-    fn from(error: object::ObjectError) -> Self {
+impl From<autocodec::CodecError> for AolError {
+    fn from(error: autocodec::CodecError) -> Self {
         AolError::ObjectParse(error)
     }
 }
@@ -93,34 +94,22 @@ impl Log {
 
         match self {
             Log::Set(key, object) => {
-                let key_bytes = key.to_bytes();
-                let object_bytes = object.serialize();
-
                 let log_size =
-                    (key_bytes.len() + object_bytes.len() + LOG_TYPE_NUM_BYTES) as LogSize;
+                    (key.encoded_size() + object.encoded_size() + LOG_TYPE_NUM_BYTES) as LogSize;
 
                 data = Vec::with_capacity(log_size as usize + LOG_SIZE_NUM_BYTES);
-                // adding log size
                 data.extend_from_slice(&log_size.to_be_bytes());
-                // adding operation
                 data.push(Self::SET);
-                // adding key
-                data.extend_from_slice(&key_bytes);
-                // adding object
-                data.extend_from_slice(&object_bytes);
+                key.encode(&mut data);
+                object.encode(&mut data);
             }
             Log::Del(key) => {
-                let key_bytes = key.to_bytes();
-
-                let log_size = (key_bytes.len() + LOG_TYPE_NUM_BYTES) as LogSize;
+                let log_size = (key.encoded_size() + LOG_TYPE_NUM_BYTES) as LogSize;
 
                 data = Vec::with_capacity(log_size as usize + LOG_SIZE_NUM_BYTES);
-                // adding log size
                 data.extend_from_slice(&log_size.to_be_bytes());
-                // adding operation
                 data.push(Self::DEL);
-                // adding key
-                data.extend_from_slice(&key_bytes);
+                key.encode(&mut data);
             }
         }
 
@@ -144,14 +133,14 @@ impl Log {
         match log_type {
             Self::SET => {
                 // Parse key
-                let (key, remaining) = object::Key::new(data)?;
+                let (key, remaining) = object::Key::decode(data)?;
                 // Parse object
-                let (object, _) = object::Object::deserialize(remaining)?;
+                let (object, _) = object::Object::decode(remaining)?;
                 Ok(Log::Set(key, object))
             }
             Self::DEL => {
                 // Parse key
-                let (key, _) = object::Key::new(data)?;
+                let (key, _) = object::Key::decode(data)?;
                 Ok(Log::Del(key))
             }
             _ => Err(AolError::CorruptedEntry(format!(
